@@ -1,0 +1,13 @@
+{
+  "id": "mock-dsh",
+  "name": "Mock DSH Engine",
+  "version": "0.0.1",
+  "launch": {
+    "command": "node",
+    "args": ["server.js"],
+    "cwd": ".",
+    "port": { "strategy": "env", "envName": "DSH_DESKTOP_PORT" },
+    "readyCheck": { "path": "/healthz", "timeoutMs": 15000 }
+  },
+  "dataDirEnv": "DSH_DESKTOP_DATA_DIR"
+}

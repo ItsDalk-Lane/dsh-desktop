@@ -1,0 +1,19 @@
+appId: com.dshdesktop.app
+productName: DSH Desktop
+directories:
+  output: release
+files:
+  - src/**
+  - dev-engines/**
+  - package.json
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+win:
+  target: nsis
+# 注意:房子本身零原生依赖,不需要额外 asUnpack 配置。
+# 真正的原生模块在"引擎包"里,由运行时下载到 userData,不进安装包 —— 这是本架构的核心。

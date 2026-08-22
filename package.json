@@ -1,0 +1,17 @@
+{
+  "name": "dsh-desktop",
+  "version": "0.1.0",
+  "description": "DSH Desktop — a stable desktop house that hosts swappable DeepSeek Harness (dsh) engines",
+  "main": "src/main/index.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "smoke": "DSH_DESKTOP_SMOKE=1 electron .",
+    "import-engine": "node scripts/import-engine.js",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  }
+}
