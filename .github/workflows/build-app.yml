@@ -1,0 +1,55 @@
+name: build-app
+
+# 打"房子"本身的安装包(macOS DMG / Windows NSIS exe)。
+# 触发:手动,或推送 app-v* 形式的 tag(打 tag 时会额外把安装包挂到同名 Release)。
+# 注意:这是壳的安装包,不是引擎包(引擎包走 build-engines.yml)。
+# 目前无签名证书,产出的是未签名包:macOS 首次打开需右键→打开,Windows 会有 SmartScreen 提示。
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - 'app-v*'
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-15, args: '--mac --arm64', artifact: app-darwin-arm64 }
+          - { os: macos-15-intel, args: '--mac --x64', artifact: app-darwin-x64 }
+          - { os: windows-latest, args: '--win --x64', artifact: app-win32-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+        env:
+          # 没有签名证书,禁用自动发现,打未签名包
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.dmg
+            release/*.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/app-v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-dist
+          merge-multiple: true
+      - name: Create release with installers
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" --title "DSH Desktop $TAG" --notes "桌面 App 安装包(未签名)" release-dist/*.dmg release-dist/*.exe
