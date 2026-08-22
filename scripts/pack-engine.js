@@ -14,6 +14,7 @@ const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { loadEngineManifest } = require('../src/main/engine/manifest');
 const { platformKey } = require('../src/main/engine/installer');
+const { tarCommand } = require('../src/main/engine/tar');
 
 const execFileP = promisify(execFile);
 
@@ -48,7 +49,7 @@ async function main() {
   fs.mkdirSync(outDirResolved, { recursive: true });
 
   console.log(`打包 ${manifest.id}@${manifest.version} (${key}) …`);
-  await execFileP('tar', [
+  await execFileP(tarCommand(), [
     '--exclude', '.DS_Store',
     '--exclude', '._*',
     '-czf', tgzPath,

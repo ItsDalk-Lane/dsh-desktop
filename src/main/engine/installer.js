@@ -28,6 +28,7 @@ async function importFromDirectory({ fromDir, enginesRoot, currentEngineFile, se
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const { fetchJson, downloadFile } = require('./downloader');
+const { tarCommand } = require('./tar');
 const execFileP = promisify(execFile);
 
 function platformKey() {
@@ -71,7 +72,7 @@ async function installFromRelease({ indexUrl, engineId, enginesRoot, currentEngi
 
     fs.rmSync(extractDir, { recursive: true, force: true });
     fs.mkdirSync(extractDir, { recursive: true });
-    await execFileP('tar', ['-xzf', tgzPath, '-C', extractDir]);
+    await execFileP(tarCommand(), ['-xzf', tgzPath, '-C', extractDir]);
     const manifest = loadEngineManifest(extractDir); // 解压后先验契约再落地
     if (manifest.version !== version) {
       throw new Error(`manifest version ${manifest.version} != index version ${version}`);
