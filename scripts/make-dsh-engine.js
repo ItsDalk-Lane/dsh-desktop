@@ -59,11 +59,21 @@ fs.writeFileSync(
 );
 fs.writeFileSync(path.join(outDir, 'engine.json'), JSON.stringify(manifest, null, 2));
 
-const npmArgs = ['install', '--no-fund', '--no-audit', `@deepseek-ai/dsh@${version}`];
+// dsh 依赖树很大(400+ 包),npm 解析时内存消耗可观:
+// CI 的 macOS runner 只有 7GB 内存,Node 在这类机器上的默认堆上限约 2GB,会 OOM
+// (2026-08-22 首次 CI 实测)。显式放宽到 4GB,并降低并发下载数减少内存峰值。
+const npmEnv = Object.assign({}, process.env, {
+  NODE_OPTIONS: `${process.env.NODE_OPTIONS || ''} --max-old-space-size=4096`.trim(),
+});
+const npmArgs = [
+  'install', '--no-fund', '--no-audit', '--no-progress', '--maxsockets=5',
+  `@deepseek-ai/dsh@${version}`,
+];
 if (registry) npmArgs.push(`--registry=${registry}`);
 console.log(`npm ${npmArgs.join(' ')}(在 ${outDir} 下)`);
 execFileSync('npm', npmArgs, {
   cwd: outDir,
+  env: npmEnv,
   stdio: 'inherit',
   shell: process.platform === 'win32', // Windows 上 npm 是 npm.cmd
 });
