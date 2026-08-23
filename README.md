@@ -104,4 +104,8 @@ Windows 的 NSIS 安装包(.exe)必须在 Windows 环境打,已配好 CI:`.githu
 
 ## 路线图
 
-见 [docs/architecture.md](docs/architecture.md):M1 壳+引擎契约 ✅ → M2 远程下载/哈希校验/回滚 ✅ → M3 CI 预构建(工作流已交付,推到 GitHub 即激活)→ M4 房子自身自动更新 + 多引擎切换 UI。
+见 [docs/architecture.md](docs/architecture.md):M1 壳+引擎契约 ✅ → M2 远程下载/哈希校验/回滚 ✅ → M3 CI 预构建 ✅ → M4 壳自动更新 + 多引擎切换 ✅。
+
+## 发新版(壳)
+
+改 `package.json` 的 `version` → 提交推送 → `git tag -a app-v<版本> -m "..." && git push origin app-v<版本>`。CI 会构建三平台安装包并自动发布到同名 Release,已装用户会收到自动更新(macOS 未签名包会引导手动下载)。

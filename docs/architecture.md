@@ -92,7 +92,11 @@ npm init -y && npm install @deepseek-ai/dsh
   - 配套脚本:`make-dsh-engine.js`(组装指定版本引擎,engine.json 的唯一权威来源)、`merge-release-index.js`(多平台索引合并)
   - 激活方式:把本仓库推到 GitHub 即生效,无需任何 secret(用的是内置 GITHUB_TOKEN)
   - 本地已实测:make → pack 全链路模拟通过(npm install 453 包约数分钟,CI 上建议后续加 npm 缓存提速)
-- **M4 房子自身更新与多引擎**:electron-updater 自动更新壳;托盘/菜单里多引擎切换与回滚 UI
+- **M4(已完成)** 房子自身自动更新 + 多引擎切换:
+  - 壳更新:`electron-updater` 对接 GitHub Releases(启动后 5 秒 + 每 6 小时检查,自动下载,弹窗重启安装;Windows NSIS 全自动;macOS 未签名包安装步骤会失败,自动降级为打开发布页手动下载——配开发者证书后即为全自动)。菜单「壳 → 检查壳更新」
+  - 多引擎切换:菜单「引擎」动态列出已装引擎(radio 单选,当前项打点),点击即切换并重启引擎,数据目录不变、Key/会话无缝延续;安装/切换/回滚后菜单自动重建
+  - 发布流程:改 package.json 版本 → 提交 → 打 `app-v<版本>` tag 推送 → CI 构建三平台并自动创建同名 Release(安装包 + latest*.yml 更新元数据 + blockmap 增量文件)
+  - **约束**:App 版本 Release 必须比 `engines` Release 发布得晚(electron-updater 取"最新 Release");引擎 CI 是往既有 `engines` Release 覆盖资产、不改变其日期,所以天然满足
 
 ## 已知取舍(当前脚手架)
 

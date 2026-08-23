@@ -4,6 +4,9 @@ name: build-app
 # 触发:手动,或推送 app-v* 形式的 tag(打 tag 时会额外把安装包挂到同名 Release)。
 # 注意:这是壳的安装包,不是引擎包(引擎包走 build-engines.yml)。
 # 目前无签名证书,产出的是未签名包:macOS 首次打开需右键→打开,Windows 会有 SmartScreen 提示。
+#
+# mac 在单个作业里同时构建 arm64+x64:latest-mac.yml 会自动合并双架构
+# (electron-updater 靠它选对包),拆两个作业会产生两份冲突的同名 yml。
 
 on:
   workflow_dispatch: {}
@@ -17,8 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-15, args: '--mac --arm64', artifact: app-darwin-arm64 }
-          - { os: macos-15-intel, args: '--mac --x64', artifact: app-darwin-x64 }
+          - { os: macos-15, args: '--mac --arm64 --x64', artifact: app-macos }
           - { os: windows-latest, args: '--win --x64', artifact: app-win32-x64 }
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,6 +56,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+        # -R 必须带:本作业没有 checkout,不带 -R 时 gh 会去找 git 仓库而失败
         run: |
-          gh release create "$TAG" --title "DSH Desktop $TAG" --notes "桌面 App 安装包(未签名)
-          自动更新元数据(latest*.yml)已一并发布" release-dist/*.dmg release-dist/*.exe release-dist/*.zip release-dist/*.yml release-dist/*.blockmap
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" \
+            --title "DSH Desktop $TAG" \
+            --notes "桌面 App 安装包(未签名)。自动更新元数据(latest*.yml)已一并发布。" \
+            release-dist/*.dmg release-dist/*.exe release-dist/*.zip release-dist/*.yml release-dist/*.blockmap
