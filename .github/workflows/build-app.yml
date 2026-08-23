@@ -37,6 +37,9 @@ jobs:
           path: |
             release/*.dmg
             release/*.exe
+            release/*.zip
+            release/*.yml
+            release/*.blockmap
 
   release:
     if: startsWith(github.ref, 'refs/tags/app-v')
@@ -52,4 +55,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" --title "DSH Desktop $TAG" --notes "桌面 App 安装包(未签名)" release-dist/*.dmg release-dist/*.exe
+          gh release create "$TAG" --title "DSH Desktop $TAG" --notes "桌面 App 安装包(未签名)
+          自动更新元数据(latest*.yml)已一并发布" release-dist/*.dmg release-dist/*.exe release-dist/*.zip release-dist/*.yml release-dist/*.blockmap

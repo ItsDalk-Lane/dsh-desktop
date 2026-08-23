@@ -10,6 +10,7 @@ const installer = require('./engine/installer');
 const { EngineManager } = require('./engine/manager');
 const { createSplashWindow, createMainWindow } = require('./window');
 const { registerIpc } = require('./ipc');
+const { initAutoUpdater, RELEASES_PAGE } = require('./updater');
 
 // 锁定 userData 路径,保证 dev / 打包后引擎和数据都落在同一个地方
 app.setName('dsh-desktop');
@@ -36,6 +37,7 @@ async function boot() {
   const houseLog = createLogger(paths.houseLogFile());
   const engineLog = createLogger(paths.engineLogFile());
   houseLog.info(`house starting — version ${app.getVersion()} smoke=${SMOKE}`);
+  const updater = initAutoUpdater(houseLog);
 
   const manager = new EngineManager({ paths, registry, logger: houseLog, engineLogger: engineLog });
   let splash = null;
@@ -70,6 +72,7 @@ async function boot() {
       force: true,
     });
     houseLog.info(`imported engine ${manifest.id}@${manifest.version}`);
+    buildMenu();
     return manifest;
   }
 
@@ -101,7 +104,9 @@ async function boot() {
         message: `已安装 ${m.name} @ ${m.version}`,
         detail: '即将重启引擎。',
       });
+      buildMenu();
       await startFlow();
+      buildMenu();
     } catch (e) {
       houseLog.error(`engine install from release failed: ${e.message}`);
       dialog.showMessageBoxSync({ type: 'error', message: '引擎安装失败', detail: e.message });
@@ -116,21 +121,56 @@ async function boot() {
     }
     registry.setCurrent(paths.currentEngineFile(), prev.dir, prev.id);
     houseLog.info(`rolled back to ${prev.id} at ${prev.dir}`);
+    buildMenu();
     dialog.showMessageBoxSync({ type: 'info', message: `已回滚到 ${prev.id}`, detail: '即将重启引擎。' });
     await startFlow();
+    buildMenu();
   }
 
-  function setupMenu() {
+  // M4:切换住客 —— 指到哪个引擎并重启;数据目录不变,Key/会话无缝延续
+  async function switchEngine(entry) {
+    const current = registry.getCurrent(paths.currentEngineFile(), paths.enginesRoot());
+    if (current && current === entry.dir) return; // 已在运行,无事可做
+    registry.setCurrent(paths.currentEngineFile(), entry.dir, entry.id);
+    houseLog.info(`switch engine -> ${entry.id}@${entry.version}`);
+    buildMenu();
+    await startFlow();
+    buildMenu();
+  }
+
+  // 菜单随引擎列表动态重建(安装/切换/回滚后都会重新调用)
+  function buildMenu() {
+    const installed = registry.listInstalled(paths.enginesRoot());
+    const currentDir = registry.getCurrent(paths.currentEngineFile(), paths.enginesRoot());
+    const engineItems = installed.map((e) => ({
+      label: `${e.name}  ${e.version}`,
+      type: 'radio',
+      checked: e.dir === currentDir,
+      click: () => switchEngine(e),
+    }));
+
     const template = [
       ...(process.platform === 'darwin' ? [{ role: 'appMenu' }] : []),
       {
         label: '引擎',
         submenu: [
-          { label: '检查并安装更新…', click: () => checkEngineUpdate() },
+          { label: '检查并安装引擎更新…', click: () => checkEngineUpdate() },
           { label: '回滚到上一版本', click: () => rollbackEngine() },
+          { type: 'separator' },
+          ...(engineItems.length
+            ? engineItems
+            : [{ label: '(未安装引擎)', enabled: false }]),
           { type: 'separator' },
           { label: '打开日志目录', click: () => shell.openPath(paths.logsDir()) },
           { label: '打开引擎数据目录', click: () => shell.openPath(paths.engineDataDir()) },
+        ],
+      },
+      {
+        label: '壳',
+        submenu: [
+          { label: `当前版本 ${app.getVersion()}`, enabled: false },
+          { label: '检查壳更新…', click: () => updater.checkNow() },
+          { label: '手动下载壳更新…', click: () => shell.openExternal(RELEASES_PAGE) },
         ],
       },
       { role: 'editMenu' },
@@ -201,6 +241,6 @@ async function boot() {
     logsDir: () => paths.logsDir(),
   });
 
-  setupMenu();
+  buildMenu();
   await startFlow();
 }

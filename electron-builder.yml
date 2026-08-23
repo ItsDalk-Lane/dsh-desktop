@@ -6,14 +6,23 @@ files:
   - src/**
   - dev-engines/**
   - package.json
+publish:
+  provider: github
+  owner: ItsDalk-Lane
+  repo: dsh-desktop
 mac:
   category: public.app-category.developer-tools
   target:
+    # zip 供 electron-updater 增量更新用(latest-mac.yml 指向 zip)
     - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
       arch:
         - arm64
         - x64
 win:
   target: nsis
-# 注意:房子本身零原生依赖,不需要额外 asUnpack 配置。
-# 真正的原生模块在"引擎包"里,由运行时下载到 userData,不进安装包 —— 这是本架构的核心。
+# 注意:房子本身除 electron-updater 外零原生依赖。
+# 真正的原生模块在"引擎包"里,由运行时下载到 userData —— 这是本架构的核心。
