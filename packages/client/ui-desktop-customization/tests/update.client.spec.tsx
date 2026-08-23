@@ -28,8 +28,9 @@ describe('Desktop online updates', () => {
     render(<UpdateSection bridge={bridge} />)
     await act(async () => {})
 
-    expect(screen.getByText('Studio Desktop 0.1.0-rc.16')).toBeTruthy()
-    expect(screen.getByText('Harness 核心 0.1.1-rc.2')).toBeTruthy()
+    expect(screen.getByText('DSH Desktop')).toBeTruthy()
+    expect(screen.getByText('桌面版 0.1.0-rc.16')).toBeTruthy()
+    expect(screen.getByText('引擎核心 0.1.1-rc.2')).toBeTruthy()
     expect(screen.getByText('暂未开放')).toBeTruthy()
     const button = screen.getByRole('button', { name: '在线更新暂未开放' })
     expect(button.hasAttribute('disabled')).toBe(true)

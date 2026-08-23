@@ -21,16 +21,6 @@ import type {
   PluginDiagnosticExportResult,
   PluginRecoveryRetryRequest,
   PluginRecoverySnapshot,
-  PresetInstallPreviewRequest,
-  PresetInstallPreviewResult,
-  PresetInstallRequest,
-  PresetInstallResult,
-  PresetRuntimeRequest,
-  PresetRuntimeSnapshot,
-  PresetSquareDetailQuery,
-  PresetSquareDetailResult,
-  PresetSquareListQuery,
-  PresetSquareListResult,
 } from '@deepseek-ai/dsh-plugin-center-contracts'
 
 /** Update lifecycle exposed to the sandboxed renderer. */
@@ -102,16 +92,6 @@ export interface DesktopBridge {
     detail(query: CatalogDetailQuery): Promise<CatalogDetailResult>
     checkCompatibility(request: CompatibilityRequest): Promise<CompatibilityDecision>
   }
-  readonly presetSquare: {
-    /** Browser fixtures may browse, but only Desktop can mutate the local roster. */
-    readonly mutationsEnabled: boolean
-    list(query: PresetSquareListQuery): Promise<PresetSquareListResult>
-    detail(query: PresetSquareDetailQuery): Promise<PresetSquareDetailResult>
-    previewInstall(request: PresetInstallPreviewRequest): Promise<PresetInstallPreviewResult>
-    install(request: PresetInstallRequest): Promise<PresetInstallResult>
-    checkRuntime(request: PresetRuntimeRequest): Promise<PresetRuntimeSnapshot>
-    installRuntime(request: PresetRuntimeRequest): Promise<PresetRuntimeSnapshot>
-  }
   readonly installedPlugins: {
     list(): Promise<InstalledPluginListResult>
   }
@@ -151,12 +131,6 @@ export const DESKTOP_CHANNELS = {
   catalogRefresh: 'dsh-desktop:catalog:refresh',
   catalogDetail: 'dsh-desktop:catalog:detail',
   catalogCheckCompatibility: 'dsh-desktop:catalog:check-compatibility',
-  presetSquareList: 'dsh-desktop:preset-square:list',
-  presetSquareDetail: 'dsh-desktop:preset-square:detail',
-  presetSquarePreviewInstall: 'dsh-desktop:preset-square:preview-install',
-  presetSquareInstall: 'dsh-desktop:preset-square:install',
-  presetSquareRuntimeCheck: 'dsh-desktop:preset-square:runtime-check',
-  presetSquareRuntimeInstall: 'dsh-desktop:preset-square:runtime-install',
   installedPluginsList: 'dsh-desktop:installed-plugins:list',
   pluginOperationStart: 'dsh-desktop:plugin-operation:start',
   pluginOperationGet: 'dsh-desktop:plugin-operation:get',

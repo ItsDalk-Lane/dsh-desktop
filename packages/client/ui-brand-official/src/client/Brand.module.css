@@ -1,0 +1,8 @@
+/* Product name in the sidebar brand row: the whole wordmark carries the same
+   weight so DSH and Desktop read as one name. */
+.productName {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}

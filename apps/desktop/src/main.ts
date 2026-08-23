@@ -19,19 +19,17 @@ import {
 } from 'electron'
 import electronUpdater from 'electron-updater'
 import {
-  healProfilesModuleFallback, initProfile, PROFILE_TEMPLATES,
+  initProfile, PROFILE_TEMPLATES,
 } from '@deepseek-ai/dsh-app-boot'
 import {
   decodeCatalogDetailQuery,
   decodeCatalogListQuery,
   decodePluginDiagnosticExportRequest,
   decodePluginRecoveryRetryRequest,
-  decodePresetRuntimeRequest,
   type CompatibilityFingerprint,
 } from '@deepseek-ai/dsh-plugin-center-contracts'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { AppearanceStorage } from './appearance-storage.ts'
-import { reconcileBuiltInApplications } from './built-in-applications.ts'
 import { DESKTOP_CHANNELS, type DesktopAppearanceSettings } from './desktop-bridge-contract.ts'
 import { createHostSupervisor, spawnDshWeb, type HostSupervisor } from './host-supervisor.ts'
 import { assertDesktopRequestOwner } from './plugin-center/bridge-policy.ts'
@@ -80,13 +78,6 @@ import {
   type DesktopLifecycle,
 } from './window-lifecycle.ts'
 import { reloadWithHeldFrame, type HeldReloadFrame } from './window-reload-transition.ts'
-import { PresetSquareClient } from './preset-square/client.ts'
-import { ResourcePresetSquareCatalog } from './preset-square/bundled-catalog.ts'
-import { migrateLegacyBundledContentPreset } from './preset-square/legacy-bundled-preset-migration.ts'
-import {
-  PresetRuntimeController,
-  withPresetRuntimeEnvironment,
-} from './preset-square/runtime-controller.ts'
 
 const APP_NAME = 'DSH Desktop'
 const WINDOW_WIDTH = 1440
@@ -111,7 +102,6 @@ let pluginOperationController: PluginOperationController | undefined
 let pluginRecoveryController: PluginRecoveryController | undefined
 let pluginDiagnosticExporter: PluginRecoveryDiagnosticExporter | undefined
 let pluginOwnedDataRemover: PluginOwnedDataRemover | undefined
-let presetRuntimeController: PresetRuntimeController | undefined
 let pluginRecoveryStartupBlocked = false
 
 interface PluginCenterBackend {
@@ -168,9 +158,6 @@ function hostPaths(): {
   }
 }
 
-// 应用中心内置包按需装配:DSH Desktop 发行版不带 studio 的内置应用(如 FF-LLM Wiki),
-// 留空数组保持 reconcileBuiltInApplications 流程走通但不注入任何内置包。
-const BUILT_IN_APPLICATION_BUNDLES: readonly string[] = []
 
 function assertHostArtifacts(paths: ReturnType<typeof hostPaths>): void {
   if (paths.nodeExecutable.includes('/') && !existsSync(paths.nodeExecutable)) {
@@ -201,12 +188,6 @@ function recoveryPageUrl(): string {
     ? join(process.resourcesPath, 'desktop-resources/recovery.html')
     : join(DESKTOP_DIR, 'resources/recovery.html')
   return pathToFileURL(path).href
-}
-
-function bundledPresetRoot(): string {
-  return app.isPackaged
-    ? join(process.resourcesPath, 'desktop-resources/preset-square/presets')
-    : join(DESKTOP_DIR, 'resources/preset-square/presets')
 }
 
 function isRecoveryPageUrl(raw: string): boolean {
@@ -414,18 +395,6 @@ function registerDesktopBridge(): PluginCenterBackend {
     userDataDirectory,
     hostProvidedModules,
   )
-  const presetSquare = new PresetSquareClient(
-    fetch,
-    Date.now,
-    currentHostOrigin,
-    new ResourcePresetSquareCatalog(bundledPresetRoot()),
-  )
-  presetRuntimeController = new PresetRuntimeController({
-    homeDirectory: resolveDshHome(),
-    nodeExecutable: paths.nodeExecutable,
-    packageManagerEntry: paths.packageManagerEntry,
-    electronRunAsNode: paths.electronRunAsNode,
-  })
   const systemComponents = deriveProtectedSystemComponents(paths.shippedBundleManifests)
   const readFingerprint = (
     selection: CatalogPreflightSelection,
@@ -524,34 +493,6 @@ function registerDesktopBridge(): PluginCenterBackend {
   ipcMain.handle(DESKTOP_CHANNELS.catalogCheckCompatibility, (event, value: unknown) => {
     assertDesktopSender(event)
     return compatibility.check(value)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquareList, (event, value: unknown) => {
-    assertDesktopSender(event)
-    return presetSquare.list(value)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquareDetail, (event, value: unknown) => {
-    assertDesktopSender(event)
-    return presetSquare.detail(value)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquarePreviewInstall, (event, value: unknown) => {
-    assertDesktopSender(event)
-    return presetSquare.previewInstall(value)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquareInstall, (event, value: unknown) => {
-    assertDesktopSender(event)
-    return presetSquare.install(value)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquareRuntimeCheck, (event, value: unknown) => {
-    assertDesktopSender(event)
-    const request = decodePresetRuntimeRequest(value)
-    if (presetRuntimeController === undefined) throw new Error('Preset runtime controller is unavailable')
-    return presetRuntimeController.check(request.presetId)
-  })
-  ipcMain.handle(DESKTOP_CHANNELS.presetSquareRuntimeInstall, (event, value: unknown) => {
-    assertDesktopSender(event)
-    const request = decodePresetRuntimeRequest(value)
-    if (presetRuntimeController === undefined) throw new Error('Preset runtime controller is unavailable')
-    return presetRuntimeController.install(request.presetId)
   })
   ipcMain.handle(DESKTOP_CHANNELS.installedPluginsList, async (event) => {
     assertDesktopSender(event)
@@ -730,16 +671,7 @@ async function initializePluginOperations(backend: PluginCenterBackend): Promise
     startNormalHost: async () => {
       const webProfileBundles = PROFILE_TEMPLATES['web']
       if (webProfileBundles === undefined) throw new Error('web Profile template is unavailable')
-      initProfile(profileDirectory, [...webProfileBundles, ...BUILT_IN_APPLICATION_BUNDLES])
-      reconcileBuiltInApplications(profileDirectory, BUILT_IN_APPLICATION_BUNDLES)
-      for (const manifestPath of backend.paths.shippedBundleManifests) {
-        const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as { readonly name?: string }
-        if (manifest.name !== undefined && BUILT_IN_APPLICATION_BUNDLES.includes(
-          manifest.name as typeof BUILT_IN_APPLICATION_BUNDLES[number],
-        )) {
-          healProfilesModuleFallback(manifestPath, dshHome)
-        }
-      }
+      initProfile(profileDirectory, [...webProfileBundles])
       const dshmarketMigration = await migrateLegacyDshmarketRegistration({
         profileDirectory,
         installAnchor: backend.paths.cliManifest,
@@ -761,12 +693,6 @@ async function initializePluginOperations(backend: PluginCenterBackend): Promise
       })
       for (const item of compatibility.deactivated) {
         console.warn(`disabled incompatible plugin before Host start: ${item.pluginId}@${item.version}`)
-      }
-      if (await migrateLegacyBundledContentPreset({
-        homeDirectory: dshHome,
-        bundledPresetRoot: bundledPresetRoot(),
-      })) {
-        console.warn('migrated legacy bundled content Preset before Host start')
       }
       return await currentHost.start()
     },
@@ -821,10 +747,10 @@ async function boot(): Promise<void> {
   host = createHostSupervisor({
     spawnHost: () => spawnDshWeb({
       ...paths,
-      env: withPresetRuntimeEnvironment({
+      env: {
         ...process.env,
         DSH_DESKTOP: '1',
-      }, resolveDshHome()),
+      },
     }),
     log: chunk => process.stderr.write(chunk),
     onUnexpectedExit: ({ code, signal }) => {

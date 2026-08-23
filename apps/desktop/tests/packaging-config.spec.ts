@@ -17,7 +17,9 @@ interface DesktopPackage {
     readonly mac: {
       readonly hardenedRuntime: boolean
       readonly icon: string
+      readonly identity: string
       readonly notarize: boolean
+      readonly target: readonly { readonly target: string; readonly arch: readonly string[] }[]
     }
     readonly win: { readonly artifactName: string; readonly icon: string; readonly target: readonly string[] }
     readonly nsis: {

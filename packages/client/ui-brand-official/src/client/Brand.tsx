@@ -1,22 +1,23 @@
-import { BrandWordmark, FishLogo } from '@deepseek-ai/dsh-client-ui-primitives'
+import { DshMark } from './DshMark.tsx'
+import css from './Brand.module.css'
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SidebarBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 
 type OfficialBrandMarkProps = HeroBrandMarkOwnerProps & SidebarBrandMarkOwnerProps
 
 /**
- * Render the official mark with the presentation requested by its host surface.
+ * Render the DSH Desktop mark with the presentation requested by its host surface.
  * @param props - Host-supplied mark presentation.
- * @returns the official whale mark.
+ * @returns the DSH Desktop network mark.
  */
 export function OfficialBrandMark({ size, className }: OfficialBrandMarkProps) {
-  return <FishLogo size={size} className={className} />
+  return <DshMark size={size} className={className} />
 }
 
 /**
- * Render the official name artwork without its independently slotted mark.
- * @returns the official name wordmark.
+ * Render the DSH Desktop product name.
+ * @returns the product-name text.
  */
 export function OfficialBrandName() {
-  return <BrandWordmark includeMark={false} />
+  return <span className={css.productName}>DSH Desktop</span>
 }

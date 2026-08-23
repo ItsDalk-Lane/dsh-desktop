@@ -11,7 +11,7 @@ export interface UpdateSectionInjected {
 
 export type UpdateSectionProps = Partial<UpdateSectionInjected>
 
-/** Render the installed Studio shell and embedded Harness core versions. */
+/** Render the installed DSH Desktop shell and embedded engine core versions. */
 export function UpdateSection({ bridge }: UpdateSectionProps): ReactNode {
   const [state, setState] = useState<DesktopUpdateState | undefined>(undefined)
   useEffect(() => {
@@ -30,9 +30,9 @@ export function UpdateSection({ bridge }: UpdateSectionProps): ReactNode {
       <div className={css.updateCard}>
         <div className={css.updateIcon}>DSH</div>
         <div className={css.updateIdentity}>
-          <strong>DeepSeek Harness Desktop</strong>
-          <span>Studio Desktop {state?.currentVersion ?? '读取中…'}</span>
-          <span>Harness 核心 {state?.harnessVersion ?? '读取中…'}</span>
+          <strong>DSH Desktop</strong>
+          <span>桌面版 {state?.currentVersion ?? '读取中…'}</span>
+          <span>引擎核心 {state?.harnessVersion ?? '读取中…'}</span>
         </div>
         <span className={css.statusPill}>暂未开放</span>
       </div>

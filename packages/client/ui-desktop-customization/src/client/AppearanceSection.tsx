@@ -24,7 +24,7 @@ const THEME_COPY: Readonly<Record<BuiltinAppearanceTheme, {
 }>> = Object.freeze({
   official: Object.freeze({
     name: '官方原版',
-    description: '不使用背景图片，恢复 DeepSeek Harness 原生界面。',
+    description: '不使用背景图片，恢复 DSH Desktop 原生界面。',
   }),
   'whale-maid': Object.freeze({
     name: '大肥鱼拟人',
@@ -197,7 +197,7 @@ function LoadedAppearance({ controller }: AppearanceSectionInjected): ReactNode 
       <div className={css.preview} style={previewStyle} role="img" aria-label="当前背景预览">
         <div className={css.previewChrome}>
           <span />
-          <strong>DeepSeek Harness</strong>
+          <strong>DSH Desktop</strong>
         </div>
         <div className={css.previewGlass}>
           <span>背景预览</span>
