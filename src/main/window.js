@@ -52,4 +52,26 @@ function isAllowed(url) {
   }
 }
 
-module.exports = { createMainWindow, isAllowed };
+// 插件中心窗口:房子自己的管家 UI(与兜底页同类),不加载引擎页面。
+// 同样加固:外部链接丢给系统浏览器,页面本身只是本地静态文件。
+function createPluginWindow() {
+  const win = new BrowserWindow(
+    Object.assign(baseOptions(), {
+      width: 940,
+      height: 680,
+      minWidth: 720,
+      minHeight: 480,
+      backgroundColor: '#0b0e14',
+      title: '插件中心',
+    })
+  );
+  win.setMenuBarVisibility(false);
+  win.webContents.setWindowOpenHandler(({ url: target }) => {
+    shell.openExternal(target);
+    return { action: 'deny' };
+  });
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'plugins.html'));
+  return win;
+}
+
+module.exports = { createMainWindow, createPluginWindow, isAllowed };

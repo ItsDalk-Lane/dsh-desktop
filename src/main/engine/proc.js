@@ -107,4 +107,4 @@ function stopEngine(child, timeoutMs = 5000) {
   });
 }
 
-module.exports = { getFreePort, spawnEngine, waitForReady, stopEngine };
+module.exports = { getFreePort, spawnEngine, waitForReady, stopEngine, resolveCommand };

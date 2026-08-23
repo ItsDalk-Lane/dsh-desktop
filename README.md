@@ -53,18 +53,20 @@ dsh-desktop/
 ├── src/main/
 │   ├── index.js            # 入口:编排启动流程(引擎就绪后直接显示引擎 UI,无过渡页)
 │   ├── window.js           # 窗口创建与加固(沙箱、回环导航限制)
-│   ├── preload.js          # 兜底页与主进程之间的安全 IPC 通道
-│   ├── ipc.js              # 兜底页动作:重试/打开日志/导入 mock/退出
+│   ├── preload.js          # 兜底页/插件中心与主进程之间的安全 IPC 通道
+│   ├── ipc.js              # 兜底页动作:重试/打开日志/导入 mock/退出;插件中心通道
 │   ├── paths.js            # userData 布局(engines/ engine-data/ logs/)
 │   ├── logger.js           # house.log + engine.log 双日志
+│   ├── plugins.js          # 插件中心:npm 目录搜索 + 安装事务(快照/回滚)
 │   └── engine/
-│       ├── manifest.js     # engine.json 契约:加载与校验(门)
+│       ├── manifest.js     # engine.json 契约:加载与校验(门),含可选 plugins 段
 │       ├── manager.js      # 引擎状态机:idle→starting→ready/failed
-│       ├── proc.js         # 子进程:随机端口、就绪探测、优雅退出
+│       ├── proc.js         # 子进程:随机端口、就绪探测、优雅退出、Electron-as-node
 │       ├── registry.js     # 已装引擎清单 + current.json 指针
 │       └── installer.js    # 本地导入(远程下载是里程碑 2)
 ├── src/renderer/
-│   └── failure.html        # 失败兜底页:重试/看日志/换引擎
+│   ├── failure.html        # 失败兜底页:重试/看日志/换引擎
+│   └── plugins.html        # 插件中心:搜索/安装/启停/卸载(管家 UI,不碰引擎界面)
 ├── dev-engines/mock-dsh/   # mock 住客,端到端验证用
 └── scripts/import-engine.js
 ```
@@ -91,6 +93,18 @@ https://github.com/<owner>/<repo>/releases/download/engines/release-index.json
 node scripts/make-dsh-engine.js <版本号> --out ./engine
 ```
 
+## 插件中心(M5)
+
+菜单「插件 → 插件中心…」:搜索 npm 生态的 dsh 插件(按 `dsh-plugin` keyword 过滤,生态已有 2000+ 包),一键安装/卸载/启停。设计参照 [deepseek-harness-studio](https://github.com/fufankeji/deepseek-harness-studio) 的插件中心骨架并按本房子裁剪:
+
+- **目录源**:npm registry search API,只显示声明了 `dsh-plugin` keyword 的包;装前校验精确版本存在且带 keyword
+- **安装事务**:校验 → 快照 profile → 停引擎 → `dsh plugin`(pnpm 透传)装精确版本(`--save-exact`)→ 写入 `dsh.profile.bundles` 启用 → 重启引擎;任何一步失败回滚快照并再次重启,绝不把坏状态留给用户
+- **状态展示**:「已安装/已启用」从 profile 派生,不建第二份账本;运行态以引擎内「设置 → 插件」为权威
+- **安全**:渲染层(插件中心窗口)只提交闭集意图(包名+精确版本),命令行/URL 全部由主进程从 `engine.json` 的 `plugins` 段构造;`node` 用 Electron 自身(`ELECTRON_RUN_AS_NODE`),与引擎子进程同一条解析路径
+- **升级契约**:`engine.json` 新增可选 `plugins` 段(`binPath`/`profile`/`homeEnv`),由 `make-dsh-engine.js` 生成;上游 dsh 改 CLI 布局时只改生成器,房子零改动。没有该段的引擎(如 mock)自动隐藏插件能力
+
+2026-08-23 已端到端实测:搜索、安装 `dsh-cost-meter@1.5.38`、引擎重启后 Loader 组装(`[dsh-cost-meter] 已加载` 见于 engine.log)、禁用、卸载、坏版本拒绝、模拟 pnpm 失败后的快照回滚。
+
 ## 打包安装包(房子本身)
 
 ```bash
@@ -103,7 +117,7 @@ Windows 的 NSIS 安装包(.exe)必须在 Windows 环境打,已配好 CI:`.githu
 
 ## 路线图
 
-见 [docs/architecture.md](docs/architecture.md):M1 壳+引擎契约 ✅ → M2 远程下载/哈希校验/回滚 ✅ → M3 CI 预构建 ✅ → M4 壳自动更新 + 多引擎切换 ✅。
+见 [docs/architecture.md](docs/architecture.md):M1 壳+引擎契约 ✅ → M2 远程下载/哈希校验/回滚 ✅ → M3 CI 预构建 ✅ → M4 壳自动更新 + 多引擎切换 ✅ → M5 插件中心 ✅。
 
 ## 发新版(壳)
 

@@ -8,7 +8,8 @@ const { createLogger } = require('./logger');
 const registry = require('./engine/registry');
 const installer = require('./engine/installer');
 const { EngineManager } = require('./engine/manager');
-const { createMainWindow } = require('./window');
+const { PluginCenter } = require('./plugins');
+const { createMainWindow, createPluginWindow } = require('./window');
 const { registerIpc } = require('./ipc');
 const { initAutoUpdater, RELEASES_PAGE } = require('./updater');
 
@@ -41,6 +42,8 @@ async function boot() {
 
   const manager = new EngineManager({ paths, registry, logger: houseLog, engineLogger: engineLog });
   let main = null;
+  let pluginCenter = null;
+  let pluginWin = null;
 
   const sendStatus = () => {
     const s = manager.status;
@@ -135,6 +138,44 @@ async function boot() {
     buildMenu();
   }
 
+  // ---- 插件中心 -------------------------------------------------------------
+  // 每次引擎(重新)启动后重建控制面:清单跟着引擎走,换住客/升版本自动带上新契约
+  function ensurePluginCenter(engineDir) {
+    pluginCenter = new PluginCenter({
+      paths,
+      manifest: manager.manifest,
+      engineDir,
+      logger: houseLog,
+      stopEngine: () => manager.stop(),
+      startEngine: restartEngineForPlugins,
+    });
+    pluginCenter.on('event', (ev) => {
+      if (pluginWin && !pluginWin.isDestroyed()) pluginWin.webContents.send('plugin:event', ev);
+    });
+  }
+
+  // 插件事务的重启出口:与 startFlow 同款,但把失败抛回给事务(触发回滚)
+  async function restartEngineForPlugins() {
+    const engineDir = await resolveEngineDir();
+    try {
+      const url = await manager.start(engineDir);
+      if (!main || main.isDestroyed()) main = createMainWindow();
+      presentPage(() => main.loadURL(url));
+    } catch (e) {
+      showFailure();
+      throw e;
+    }
+  }
+
+  function openPluginCenter() {
+    if (pluginWin && !pluginWin.isDestroyed()) {
+      pluginWin.focus();
+      return;
+    }
+    pluginWin = createPluginWindow();
+    pluginWin.on('closed', () => { pluginWin = null; });
+  }
+
   // 菜单随引擎列表动态重建(安装/切换/回滚后都会重新调用)
   function buildMenu() {
     const installed = registry.listInstalled(paths.enginesRoot());
@@ -160,6 +201,17 @@ async function boot() {
           { type: 'separator' },
           { label: '打开日志目录', click: () => shell.openPath(paths.logsDir()) },
           { label: '打开引擎数据目录', click: () => shell.openPath(paths.engineDataDir()) },
+        ],
+      },
+      {
+        label: '插件',
+        submenu: [
+          { label: '插件中心…', click: () => openPluginCenter() },
+          { type: 'separator' },
+          {
+            label: '打开插件数据目录',
+            click: () => shell.openPath(path.join(paths.engineDataDir(), 'profiles')),
+          },
         ],
       },
       {
@@ -189,6 +241,7 @@ async function boot() {
 
     try {
       const url = await manager.start(engineDir);
+      ensurePluginCenter(engineDir);
       if (!main || main.isDestroyed()) main = createMainWindow();
       presentPage(() => main.loadURL(url));
       if (SMOKE) {
@@ -239,6 +292,7 @@ async function boot() {
     startFlow,
     importMockEngine,
     logsDir: () => paths.logsDir(),
+    getPluginCenter: () => pluginCenter,
   });
 
   buildMenu();

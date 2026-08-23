@@ -50,6 +50,12 @@ const manifest = {
     readyCheck: { path: '/', timeoutMs: 120000, intervalMs: 500 },
   },
   dataDirEnv: 'DSH_HOME',
+  // 插件中心契约:上游 dsh 改 CLI 布局/profile 约定时只改这里,房子零改动
+  plugins: {
+    binPath: 'node_modules/@deepseek-ai/dsh/lib/bin.js',
+    profile: 'web',
+    homeEnv: 'DSH_HOME',
+  },
 };
 
 fs.mkdirSync(outDir, { recursive: true });

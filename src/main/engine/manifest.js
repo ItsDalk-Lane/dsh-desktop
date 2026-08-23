@@ -24,7 +24,12 @@ const path = require('path');
 //     "readyCheck": { "path": "/healthz", "timeoutMs": 15000 }  // 就绪探测
 //   },
 //   "dataDirEnv": "DSH_DESKTOP_DATA_DIR",  // 可选,房子把持久数据目录注入给引擎
-//   "env": {}                    // 可选,额外环境变量
+//   "env": {},                   // 可选,额外环境变量
+//   "plugins": {                 // 可选,声明引擎的插件管理入口(插件中心用):
+//     "binPath": "node_modules/@deepseek-ai/dsh/lib/bin.js",  // dsh CLI 相对引擎目录的路径
+//     "profile": "web",         // 房子操作的 dsh profile 名
+//     "homeEnv": "DSH_HOME"     // 数据目录变量名,缺省沿用 dataDirEnv
+//   }
 // }
 
 const REQUIRED_FIELDS = ['name', 'version', 'launch'];
@@ -74,7 +79,21 @@ function loadEngineManifest(engineDir) {
     },
     dataDirEnv: raw.dataDirEnv || null,
     env: raw.env || {},
+    plugins: normalizePluginsSection(raw.plugins),
     sourceDir: engineDir,
+  };
+}
+
+// 插件管理入口契约(可选段)。上游 dsh 改了 CLI 布局时,新引擎版本改这里即可,
+// 房子的插件中心读清单而不写死 —— 与 launch 段同一套吸收机制。
+function normalizePluginsSection(plugins) {
+  if (!plugins) return null;
+  if (typeof plugins !== 'object') throw new Error('engine.json plugins section must be an object');
+  if (!plugins.binPath) throw new Error('engine.json plugins section missing binPath');
+  return {
+    binPath: plugins.binPath,
+    profile: plugins.profile || 'web',
+    homeEnv: plugins.homeEnv || null,
   };
 }
 

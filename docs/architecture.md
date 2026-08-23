@@ -98,6 +98,8 @@ npm init -y && npm install @deepseek-ai/dsh
   - 发布流程:改 package.json 版本 → 提交 → 打 `app-v<版本>` tag 推送 → CI 构建三平台并自动创建同名 Release(安装包 + latest*.yml 更新元数据 + blockmap 增量文件)
   - **约束**:App 版本 Release 必须比 `engines` Release 发布得晚(electron-updater 取"最新 Release");引擎 CI 是往既有 `engines` Release 覆盖资产、不改变其日期,所以天然满足
 
+- **M5(已完成)** 插件中心:菜单「插件 → 插件中心…」,搜索 npm 生态(`dsh-plugin` keyword,2000+ 包)、一键安装/启停/卸载。核心是主进程 `src/main/plugins.js` 的安装事务:装前校验精确版本 → 快照 profile(package.json + lockfile 到 `.plugin-backup/`)→ 停引擎 → `dsh plugin --profile web add <pkg>@<version> --save-exact`(pnpm 透传,`node` 走 Electron-as-node,与引擎同一解析路径)→ 包名写入 `dsh.profile.bundles` 启用 → 重启引擎 → 失败回滚快照并再次重启。渲染层只提交闭集意图,命令行/URL 全由主进程从 `engine.json` 可选 `plugins` 段构造(`binPath`/`profile`/`homeEnv`,由 make-dsh-engine.js 生成,上游改布局时只改生成器);没有该段的引擎(如 mock)自动隐藏插件能力。已装/已启用状态从 profile 派生不建第二账本,运行态以引擎内「设置 → 插件」为权威。2026-08-23 端到端实测:安装 dsh-cost-meter@1.5.38 → 引擎重启 → Loader 组装(engine.log `[dsh-cost-meter] 已加载`)→ 禁用 → 卸载 → 状态归零;坏版本拒绝、模拟 pnpm 失败回滚均通过。设计参照 deepseek-harness-studio 插件中心(裁剪:不自建 Registry、无故障注入恢复矩阵;保留:三段式事务、闭集意图、Electron 存活期拥有变更)。
+
 ## 已知取舍(当前脚手架)
 
 - `before-quit` 里引擎停止是 fire-and-forget(SIGTERM 后 App 即退);极端情况子进程可能存活数秒,需要更强的进程守护时再引入 detached + pid 追踪
