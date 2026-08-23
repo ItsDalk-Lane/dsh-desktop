@@ -1,105 +1,131 @@
-# 架构:房子与住客
+# DeepSeek Harness Architecture
 
-## 模型
+English | [中文](architecture.zh.md)
 
+Read this before changing anything under `packages/`. It assumes you know Cordis; if you do not, start with the [primer](cordis-primer.md) or the [tutorial](cordis-tutorial/index.md).
+
+We recommend using an agent to explore the codebase and understand its architecture.
+
+## Cordis
+
+[Cordis](cordis-primer.md) is the framework under dsh: plugins contribute services, typed events, and reversible effects to a shared context. Every part of the product is a plugin, including the model adapter, the tool registry, the session log, and the agent loop itself, so every part is replaceable from configuration.
+
+There is no privileged core to patch: you extend dsh by mounting a plugin beside the others, and registrations are effects that unwind when their plugin unloads.
+
+## Profiles and bundles
+
+A running `dsh` is a plugin tree composed at boot from ordered layers.
+
+A **profile** is a named composition stored in the Harness home. It lists the bundles it stacks, holds any out-of-tree plugins it installs, and keeps the user's own `cordis.patch.yml`. `web` and `headless` ship as templates.
+
+A **bundle** is a distribution format for Cordis config rows and the code they mount, so whatever it inserts stays patchable by the layers above it.
+
+Each declares itself in its own `package.json` under a `dsh` field: `dsh.profile` lists a profile's bundles, and `dsh.bundle` points at a bundle's patch file.
+
+[`dsh-base`](../packages/bundle/base/README.md) is the first layer of every profile: model adapters, tools, persistence, sandbox and approval policy, settings, credentials, telemetry. [`dsh-web-app`](../packages/bundle/web-app/README.md) adds the browser application; [`dsh-headless`](../packages/bundle/headless/README.md) adds a one-shot runner with no server at all.
+
+Layers apply to an empty entry list in this order: each bundle in the profile's listed order, then the profile's `cordis.patch.yml`, then the home-level one, then any `--patch` overlay. A patch targets a row by id and replaces its whole config, or inserts new rows.
+
+To see the tree your machine actually boots:
+
+```sh
+dsh --profile web --dump-config
 ```
-┌─────────────── DSH Desktop(房子,Electron) ────────────────┐
-│  主进程                                                      │
-│   ├─ 引擎管理器(状态机) ── spawn ──► 引擎子进程(住客)     │
-│   │                                      │ 自带 Web UI      │
-│   ├─ 启动画面 / 失败兜底页               │ engine.json 契约 │
-│   └─ 主窗口 BrowserWindow ──加载──► http://127.0.0.1:<随机端口>│
-└──────────────────────────────────────────────────────────────┘
-        userData/engines/<id>/          ← 住客住处(可多版本共存)
-        userData/engine-data/           ← 住客的行李(用户数据,换人不丢)
-```
 
-关键点:
+Any row it prints can be replaced by a patch of your own.
 
-1. **主窗口加载的是引擎自带的 Web UI**,壳不做任何界面;换引擎后界面自动是新的。
-2. **主窗口无 preload、无 Node 权限**,且导航被限制在 127.0.0.1/localhost,外链丢给系统浏览器。
-3. **数据与安装分离**:引擎用户数据通过 `dataDirEnv` 注入统一目录,换住客、升级房子都不丢。
-4. **端口**:优先让引擎接受随机端口注入(`strategy: env`,防和用户已在跑的 dsh 冲突);引擎只支持固定端口时用 `strategy: fixed`。
+Composition mechanics are in [app-boot](../packages/boot/app-boot/README.md#profiles); config fields are in the generated [config catalog](config-catalog.md).
 
-## engine.json —— 门(唯一契约)
+## Core packages
 
-| 字段 | 必填 | 说明 |
+Here are some core packages that contribute to the Cordis tree.
+
+| Package | Owns | `ctx` key |
 |---|---|---|
-| `id` | 建议 | 引擎标识,即 `engines/` 下目录名,缺省取目录名 |
-| `name` / `version` | 是 | 展示用 |
-| `launch.command` | 是 | 启动命令,在引擎目录下执行 |
-| `launch.args` | 否 | 命令参数 |
-| `launch.cwd` | 否 | 工作目录,相对引擎目录,缺省 `.` |
-| `launch.port.strategy` | 否 | `env`(默认,推荐)或 `fixed` |
-| `launch.port.envName` | 否 | env 模式下端口注入的变量名,缺省 `DSH_DESKTOP_PORT` |
-| `launch.port.value` | fixed 必填 | 固定端口号 |
-| `launch.readyCheck.path` | 否 | 就绪探测路径,缺省 `/` |
-| `launch.readyCheck.timeoutMs` | 否 | 就绪超时,缺省 20000 |
-| `dataDirEnv` | 否 | 房子把 `userData/engine-data` 注入到该变量 |
-| `env` | 否 | 额外环境变量 |
+| [`core/session`](subsystems/session.md) | The append-only `SessionEvent` log and in-memory store | `ctx.sessions` |
+| [`core/system-prompt`](subsystems/system-prompt.md) | Prompt-section and tool-schema assembly | `ctx.systemPrompt` |
+| [`core/tools`](subsystems/tools.md) | The scoped tool registry and guarded execution pipeline | `ctx.tools` |
+| [`core/agent`](subsystems/core.md) | The `Agent` interface, live registry, and `agent/*` events | `ctx.agents` |
+| [`core/agent-loop`](subsystems/core.md) | The default driver implementing that interface | `ctx.agentLoop` |
+| [`core/scope`](subsystems/scope.md) | The per-agent scoped-registration primitive | library, no key |
+| [`llm/llm`](subsystems/llm-streaming.md) | Message and stream vocabulary plus the adapter seam | `ctx.llm` |
 
-上游 dsh 改了启动方式时,新引擎版本带一份新清单即可,房子的启动逻辑读清单而不写死 —— 大部分上游变化被清单吸收。
+## Events
 
-## 真实 dsh 引擎(已核实并实测通过)
+Events are the extension points, and picking the right domain is the first decision in most changes.
 
-2026-08-22 对照 `@deepseek-ai/dsh@0.1.1-rc.2` 实测核实的契约:
+- **Session events** are durable facts appended to the log and broadcast through `session/event`. Use one when the fact must survive a reload.
+- **Agent events** (`agent/*`) carry a live `Agent`: inbox, step, status, request, validation, continuation. Use one to observe or intercept work in flight.
+- **Capability events** attach policy and adapters to a seam (`fs/*`, `tools/*`, `telemetry/*`) without importing the loop.
 
-1. **端口**:`dsh web --port <port>` 支持显式指定(也支持 0 让系统选,但房子需要自己知道端口,所以用房子的随机端口 + `"strategy": "arg"` 的 `${PORT}` 占位符注入)
-2. **禁止自动开浏览器**:`--no-open` 必须传,否则 dsh 会和房子窗口抢浏览器
-3. **数据目录**:环境变量 `DSH_HOME` 控制 dsh 全部状态(profiles/、storages/、插件),房子通过 `dataDirEnv: "DSH_HOME"` 注入到 `userData/engine-data`
-4. **启动入口**:引擎目录内 `node node_modules/@deepseek-ai/dsh/lib/bin.js web ...`
-5. **就绪耗时**:全新 DSH_HOME 首次启动约 4~6 秒,`/` 返回 200;清单超时设 120s 留足余量
+The [event map](event-producer-consumer.md) lists every event's producers and consumers.
 
-实测通过的引擎目录(271MB,含 node_modules)组装方式:
+## Turn flow
 
-```bash
-mkdir engines/dsh && cd engines/dsh
-npm init -y && npm install @deepseek-ai/dsh
-# 写入下面这份 engine.json,然后 node <dsh-desktop>/scripts/import-engine.js engines/dsh
+A **step** is one model request plus the tools it calls. A **turn** is zero or more steps: it opens before its first input is claimed and closes once nothing is owed.
+
+```text
+turn/start
+  claim next-step input plus one queued message
+  assemble prompt sections + tool schemas
+  -> agent/pre-step                   reject | enter(messages)
+     reject, or a first enter rewritten empty -> close the turn with no step
+     step/start
+     append entered messages as user/message
+     derive model history from the log
+     agent/request -> llm/stream -> assistant/chunk* -> assistant/message
+     tool/call* -> tools/pre-execute -> tools/execute -> tools/post-execute -> tool/result*
+     step/end
+     tools owe another request, or next-step input arrived -> claim -> next step
+  -> agent/turn-stopping
+turn/end
 ```
 
-```json
-{
-  "id": "dsh",
-  "name": "DeepSeek Harness",
-  "version": "0.1.1-rc.2",
-  "launch": {
-    "command": "node",
-    "args": ["node_modules/@deepseek-ai/dsh/lib/bin.js", "web",
-             "--host", "127.0.0.1", "--no-open", "--port", "${PORT}"],
-    "port": { "strategy": "arg" },
-    "readyCheck": { "path": "/", "timeoutMs": 120000, "intervalMs": 500 }
-  },
-  "dataDirEnv": "DSH_HOME"
-}
-```
+`turn/*`, `step/*`, `user/message`, `assistant/*`, and `tool/*` are durable session events; the rest are live extension points across three domains. `agent/pre-step`, `agent/request`, `llm/stream`, and the three `tools/*` events are waterfalls, whose listeners must call `next()` to delegate; `agent/turn-stopping` is serial and has no `next()`.
 
-上游发新版时:改 `version`、`npm install @deepseek-ai/dsh@<新版本>`、重新导入 —— 房子零改动。
+Input reaches the driver through one inbox. Some messages wake it immediately; injected context waits in the inbox until another message does.
 
-## 里程碑
+`agent/pre-step` decides what the model sees. Listeners may rewrite the claimed messages or reject them outright; a rejected or empty first claim still closes a durable turn that spent no step, so the log records the attempt. Each step reads the prompt sections and tool schemas that plugins registered.
 
-- **M1(已完成)** 房子壳:启动画面、引擎状态机、本地导入、失败兜底、mock 引擎端到端验证;**真 dsh 0.1.1-rc.2 引擎已接入并实测通过**(随机端口注入、DSH_HOME 重定向、原版 Web UI 加载)
-- **M2(已完成)** 远程下载引擎:`installFromRelease()` 全链路实测通过——取发布索引 → 按 `平台-架构` 选包 → 流式下载(边下边算 sha256、停滞超时保护)→ 解压到 `.staging` → 校验 engine.json → 原子 rename 到 `engines/<id>@<version>` → 切 current 指针。任何一步失败都清理现场、不动当前引擎(坏哈希实测被干净拒绝)。配套:
-  - `scripts/pack-engine.js` —— 本地引擎打包成 `<id>-<version>-<平台>.tgz` + 合并 `release-index.json`(sha256/size),产物扔到任意静态托管即成发布源
-  - `scripts/fetch-engine.js` —— 命令行安装(与 App 菜单同一条代码路径)
-  - 应用菜单「引擎」:检查并安装更新 / 回滚到上一版本(current.json 的 previous 指针,实测来回切换正常)
-  - 发布源配置:环境变量 `DSH_DESKTOP_RELEASE_INDEX` 或 `userData/config.json` 的 `releaseIndexUrl`
-- **M3(已交付,待推送激活)** CI 预构建:`.github/workflows/build-engines.yml` ——
-  - 触发:手动指定版本 + 每日自动检查上游新版本(没变化则跳过,不耗配额)
-  - 矩阵:macos-15(darwin-arm64)、macos-15-intel(darwin-x64)、windows-latest(win32-x64);dsh 的原生模块在哪个平台装就只认哪个平台,这正是矩阵构建的意义
-  - 产物:每个平台一个 `<id>-<版本>-<平台>.tgz` + 索引分片,publish 作业合并成全局 `release-index.json` 一并挂到 GitHub Release(tag `engines`)
-  - 发布源地址即:`https://github.com/<owner>/<repo>/releases/download/engines/release-index.json`(配进房子 `releaseIndexUrl` 即闭环)
-  - 配套脚本:`make-dsh-engine.js`(组装指定版本引擎,engine.json 的唯一权威来源)、`merge-release-index.js`(多平台索引合并)
-  - 激活方式:把本仓库推到 GitHub 即生效,无需任何 secret(用的是内置 GITHUB_TOKEN)
-  - 本地已实测:make → pack 全链路模拟通过(npm install 453 包约数分钟,CI 上建议后续加 npm 缓存提速)
-- **M4(已完成)** 房子自身自动更新 + 多引擎切换:
-  - 壳更新:`electron-updater` 对接 GitHub Releases(启动后 5 秒 + 每 6 小时检查,自动下载,弹窗重启安装;Windows NSIS 全自动;macOS 未签名包安装步骤会失败,自动降级为打开发布页手动下载——配开发者证书后即为全自动)。菜单「壳 → 检查壳更新」
-  - 多引擎切换:菜单「引擎」动态列出已装引擎(radio 单选,当前项打点),点击即切换并重启引擎,数据目录不变、Key/会话无缝延续;安装/切换/回滚后菜单自动重建
-  - 发布流程:改 package.json 版本 → 提交 → 打 `app-v<版本>` tag 推送 → CI 构建三平台并自动创建同名 Release(安装包 + latest*.yml 更新元数据 + blockmap 增量文件)
-  - **约束**:App 版本 Release 必须比 `engines` Release 发布得晚(electron-updater 取"最新 Release");引擎 CI 是往既有 `engines` Release 覆盖资产、不改变其日期,所以天然满足
+Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-execution-pipeline.md), and [cancellation and error recovery](subsystems/core.md#the-agent-handle).
 
-## 已知取舍(当前脚手架)
+## Session log
 
-- `before-quit` 里引擎停止是 fire-and-forget(SIGTERM 后 App 即退);极端情况子进程可能存活数秒,需要更强的进程守护时再引入 detached + pid 追踪
-- fixed 端口策略下,若端口已被别的进程占用,就绪探测可能"错认"别人的服务;接入真 dsh 前应优先核实 env 端口支持
-- 单实例锁已做;多窗口、深色标题栏等桌面细节按需再加
+The session log is the source of the context the model sees. `deriveMessages()` projects model history from it, and raw `assistant/chunk` events preserve replay and UI fidelity. Fork, resume, transcripts, telemetry, and persistence all derive from this stream.
+
+**Model-visible means logged.** Anything that reaches a model request must be reconstructable from the log, and a runtime invariant asserts it. This is why a new model-visible input requires a new session event: extend `SessionEventMap` and render from the log.
+
+## Capability seams
+
+A **seam** is a swappable capability with three roles: a **Service Definition** declaring the interface, a **Service Provider** implementing it, and a **Consumer** using it, commonly a model-facing tool. A package may combine roles, but one role alone is not a seam; adding a capability means designing all three ([capability graph](capability-seams.md)).
+
+Seams are why one provider swap changes the whole product. Filesystem and subprocess providers share one execution world, so pointing them at a remote sandbox moves Bash, PTY, and LSP with them, with no provider forks. [Subagent providers](subsystems/subagent.md) vary just as widely behind one interface, from a fresh child agent to a delegated turn in another product.
+
+[Experimental Agent Teams](subsystems/agent-team.md) is a private opt-in coordination seam on `ctx.agentTeams`, with a durable roster, task board, and mailbox layered over continuable subagents.
+
+## Where new behavior goes
+
+New behavior attaches to a documented extension point. Changing the loop itself updates this map.
+
+| Goal | Mechanism |
+|---|---|
+| Add a model provider | register its adapter on `ctx.llm` |
+| Add a model-facing capability | register on `ctx.tools`; its schema joins prompt assembly |
+| Give one session a different capability set | compose an agent preset; a service row there needs an `isolate` realm |
+| Add shell execution | register a `ctx.shell` backend; the local one spawns through `ctx.subprocess` |
+| Add persistent terminal execution | register a `ctx.terminals` backend plus `dsh-tool-terminal` |
+| Add a human command | register on `ctx.commands`; it dispatches without a model turn |
+| Add background work | register on `ctx.jobs`; `job_*` tools collect or stop it |
+| Add filesystem access or policy | register a `ctx.fs` provider or listen to `fs/*` events |
+| Confine spawned processes | use a `ctx.sandbox` backend; consumers wrap argv before spawning |
+| Intercept a request, tool, or turn | use its `agent/*` or `tools/*` event; `agent/turn-stopping` stops a turn |
+| Add model-facing context | call `agent.inject()`; it lands in the next admitted request |
+| Add UI or editor integration | drive `ctx.agents` and render from `session/event` |
+| Add a Web Client Chat node | register a `ConversationNodeDefinition` + keyed renderer |
+| Add durable session state | extend `SessionEventMap`; render and replay from the log |
+| Generate session titles | register the sole `ctx.sessionTitle` provider |
+| Manage a same-session objective | use `ctx.goals`; continue through `agent/*` |
+| Fork a live session | `ctx.sessions.fork(source, boundary?, childSessionId?)` |
+| Scope a registration to one agent | use that agent's `agent.ctx` |
+
+The [extension cookbook](cookbook/extension-cookbook.md) maps features to capabilities and indexes the step-by-step guides for [packages](cookbook/adding-a-package.md), [tools](cookbook/adding-a-tool.md), [LLM adapters](cookbook/adding-an-llm-adapter.md), [Chat nodes](cookbook/adding-a-conversation-node.md), and [settings cards](cookbook/adding-a-settings-card.md).
