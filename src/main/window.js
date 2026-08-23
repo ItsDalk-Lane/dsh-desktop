@@ -16,23 +16,9 @@ function baseOptions() {
   };
 }
 
-function createSplashWindow() {
-  const win = new BrowserWindow(
-    Object.assign(baseOptions(), {
-      width: 460,
-      height: 340,
-      frame: false,
-      resizable: false,
-      center: true,
-      backgroundColor: '#0b0e14',
-    })
-  );
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'splash.html'));
-  win.once('ready-to-show', () => win.show());
-  return win;
-}
-
-function createMainWindow(url) {
+// 无过渡页:窗口创建后保持隐藏(baseOptions 的 show:false),
+// 由调用方加载引擎 UI/失败页,页面首次绘制完成(ready-to-show)后才显示
+function createMainWindow() {
   const win = new BrowserWindow(
     Object.assign(baseOptions(), {
       width: 1440,
@@ -54,8 +40,6 @@ function createMainWindow(url) {
       shell.openExternal(target);
     }
   });
-  win.loadURL(url);
-  win.once('ready-to-show', () => win.show());
   return win;
 }
 
@@ -68,4 +52,4 @@ function isAllowed(url) {
   }
 }
 
-module.exports = { createSplashWindow, createMainWindow, isAllowed };
+module.exports = { createMainWindow, isAllowed };

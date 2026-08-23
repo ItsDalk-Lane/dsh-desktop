@@ -51,7 +51,7 @@ node scripts/import-engine.js <引擎目录> [--force]
 ```
 dsh-desktop/
 ├── src/main/
-│   ├── index.js            # 入口:编排启动流程(启动画面→引擎→主窗口)
+│   ├── index.js            # 入口:编排启动流程(引擎就绪后直接显示引擎 UI,无过渡页)
 │   ├── window.js           # 窗口创建与加固(沙箱、回环导航限制)
 │   ├── preload.js          # 兜底页与主进程之间的安全 IPC 通道
 │   ├── ipc.js              # 兜底页动作:重试/打开日志/导入 mock/退出
@@ -64,7 +64,6 @@ dsh-desktop/
 │       ├── registry.js     # 已装引擎清单 + current.json 指针
 │       └── installer.js    # 本地导入(远程下载是里程碑 2)
 ├── src/renderer/
-│   ├── splash.html         # 启动画面(唯一自绘 UI 之一)
 │   └── failure.html        # 失败兜底页:重试/看日志/换引擎
 ├── dev-engines/mock-dsh/   # mock 住客,端到端验证用
 └── scripts/import-engine.js

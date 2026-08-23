@@ -8,7 +8,7 @@ const { createLogger } = require('./logger');
 const registry = require('./engine/registry');
 const installer = require('./engine/installer');
 const { EngineManager } = require('./engine/manager');
-const { createSplashWindow, createMainWindow } = require('./window');
+const { createMainWindow } = require('./window');
 const { registerIpc } = require('./ipc');
 const { initAutoUpdater, RELEASES_PAGE } = require('./updater');
 
@@ -40,14 +40,11 @@ async function boot() {
   const updater = initAutoUpdater(houseLog);
 
   const manager = new EngineManager({ paths, registry, logger: houseLog, engineLogger: engineLog });
-  let splash = null;
   let main = null;
 
   const sendStatus = () => {
     const s = manager.status;
-    for (const w of [splash, main]) {
-      if (w && !w.isDestroyed()) w.webContents.send('boot:status', s);
-    }
+    if (main && !main.isDestroyed()) main.webContents.send('boot:status', s);
   };
   manager.on('status', sendStatus);
 
@@ -180,28 +177,20 @@ async function boot() {
   }
 
   async function startFlow() {
-    if (!splash || splash.isDestroyed()) splash = createSplashWindow();
-
+    // 无过渡页:引擎先启动,就绪后才创建/复用窗口加载 UI;等待期不显示任何窗口
     const engineDir = await resolveEngineDir();
     if (!engineDir) {
       manager.error = '未找到已安装的引擎。请先导入引擎(参见 README),或在开发模式下使用内置 mock 引擎。';
       manager.state = 'failed';
       sendStatus();
+      showFailure();
       return;
     }
 
     try {
       const url = await manager.start(engineDir);
-      if (!main || main.isDestroyed()) {
-        main = createMainWindow(url);
-      } else if (main.webContents.getURL() !== url) {
-        // 主窗口当前显示的是失败页,重新加载引擎 UI
-        main.loadURL(url);
-      }
-      if (splash && !splash.isDestroyed()) {
-        splash.destroy();
-        splash = null;
-      }
+      if (!main || main.isDestroyed()) main = createMainWindow();
+      presentPage(() => main.loadURL(url));
       if (SMOKE) {
         main.webContents.once('did-finish-load', () => {
           houseLog.info('SMOKE_OK: window loaded engine UI');
@@ -217,16 +206,27 @@ async function boot() {
     }
   }
 
+  // 加载一个页面,等它首次绘制完成(ready-to-show)才显示窗口。
+  // 窗口已可见时(切引擎/重试)show 是空操作,旧页面保持显示直到新页面就绪。
+  // 主帧加载失败必须亮出失败页,否则窗口会永远隐藏。
+  function presentPage(load) {
+    const onReady = () => {
+      main.webContents.removeListener('did-fail-load', onFail);
+      if (!main.isDestroyed()) main.show();
+    };
+    const onFail = (_e, _code, _desc, _validated, isMain) => {
+      if (!isMain || main.isDestroyed()) return;
+      main.removeListener('ready-to-show', onReady);
+      showFailure();
+    };
+    main.once('ready-to-show', onReady);
+    main.webContents.once('did-fail-load', onFail);
+    load();
+  }
+
   function showFailure() {
-    const failureUrl = path.join(__dirname, '..', 'renderer', 'failure.html');
-    if (splash && !splash.isDestroyed()) {
-      splash.loadFile(failureUrl);
-      splash.setSize(560, 460);
-      splash.setResizable(true);
-      return;
-    }
-    if (!main || main.isDestroyed()) main = createMainWindow('about:blank');
-    main.loadFile(failureUrl);
+    if (!main || main.isDestroyed()) main = createMainWindow();
+    presentPage(() => main.loadFile(path.join(__dirname, '..', 'renderer', 'failure.html')));
   }
 
   app.on('before-quit', () => {
