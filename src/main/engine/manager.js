@@ -53,7 +53,7 @@ class EngineManager extends EventEmitter {
           ? manifest.launch.port.value
           : await getFreePort();
 
-      const child = spawnEngine({
+      const { child, spawnError } = spawnEngine({
         manifest,
         engineDir,
         port,
@@ -70,7 +70,10 @@ class EngineManager extends EventEmitter {
         }
       });
 
-      await waitForReady(port, manifest.launch.readyCheck);
+      // 就绪探测 vs spawn 失败,谁先到听谁的;输的一方静默收尾
+      const ready = waitForReady(port, manifest.launch.readyCheck);
+      ready.catch(() => {});
+      await Promise.race([ready, spawnError]);
       this.url = `http://127.0.0.1:${port}`;
       this.state = 'ready';
       this.logger.info(`engine ready at ${this.url}`);
