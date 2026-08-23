@@ -88,11 +88,17 @@ import {
   withPresetRuntimeEnvironment,
 } from './preset-square/runtime-controller.ts'
 
-const APP_NAME = 'DeepSeek Harness'
+const APP_NAME = 'DSH Desktop'
 const WINDOW_WIDTH = 1440
 const WINDOW_HEIGHT = 920
 const DESKTOP_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const REPOSITORY_ROOT = resolve(DESKTOP_DIR, '../..')
+
+// 数据延续:DSH Desktop 历代安装(旧壳)把引擎数据放在
+// userData/engine-data;固定 userData 目录名并强制 DSH_HOME 指向同一位置,
+// 保证 settings/会话/插件 profile 无缝继承,不随 productName 变化漂移。
+app.setPath('userData', join(app.getPath('appData'), 'dsh-desktop'))
+process.env.DSH_HOME = join(app.getPath('userData'), 'engine-data')
 
 let mainWindow: BrowserWindow | undefined
 let tray: Tray | undefined
@@ -138,7 +144,6 @@ function hostPaths(): {
       shippedBundleManifests: [
         join(REPOSITORY_ROOT, 'packages/bundle/base/package.json'),
         join(REPOSITORY_ROOT, 'packages/bundle/web-app/package.json'),
-        join(REPOSITORY_ROOT, 'packages/examples/ff-llm-wiki-plugin/package.json'),
       ],
       packageManagerEntry: join(packageManager, 'bin/pnpm.cjs'),
       packageManagerManifest: join(packageManager, 'package.json'),
@@ -155,7 +160,6 @@ function hostPaths(): {
     shippedBundleManifests: [
       join(hostModules, '@deepseek-ai/dsh-base/package.json'),
       join(hostModules, '@deepseek-ai/dsh-web-app/package.json'),
-      join(hostModules, '@fufan/dsh-plugin-llm-wiki/package.json'),
     ],
     packageManagerEntry: join(hostModules, 'pnpm/bin/pnpm.cjs'),
     packageManagerManifest: join(hostModules, 'pnpm/package.json'),
@@ -164,7 +168,9 @@ function hostPaths(): {
   }
 }
 
-const BUILT_IN_APPLICATION_BUNDLES = ['@fufan/dsh-plugin-llm-wiki'] as const
+// 应用中心内置包按需装配:DSH Desktop 发行版不带 studio 的内置应用(如 FF-LLM Wiki),
+// 留空数组保持 reconcileBuiltInApplications 流程走通但不注入任何内置包。
+const BUILT_IN_APPLICATION_BUNDLES: readonly string[] = []
 
 function assertHostArtifacts(paths: ReturnType<typeof hostPaths>): void {
   if (paths.nodeExecutable.includes('/') && !existsSync(paths.nodeExecutable)) {
