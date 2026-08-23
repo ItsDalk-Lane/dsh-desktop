@@ -92,13 +92,15 @@ https://github.com/<owner>/<repo>/releases/download/engines/release-index.json
 node scripts/make-dsh-engine.js <版本号> --out ./engine
 ```
 
-## 打包
+## 打包安装包(房子本身)
 
 ```bash
-npm run dist     # electron-builder → release/(macOS DMG / Windows NSIS)
+npm run dist    # 本机打 macOS 安装包(arm64 + x64 DMG)→ release/
 ```
 
-房子本身零原生依赖、零运行时 npm 依赖;真正的原生模块在引擎包里,由引擎侧负责(详见架构文档的里程碑规划)。
+Windows 的 NSIS 安装包(.exe)必须在 Windows 环境打,已配好 CI:`.github/workflows/build-app.yml` —— 手动触发或推送 `app-v*` tag 时,在 macOS arm64/x64 + Windows x64 三平台构建安装包;**打 tag 时会自动把安装包挂到同名 Release**。产物也可从 Actions 运行页的 Artifacts 下载。
+
+注意:当前为未签名包(无开发者证书)。macOS 首次打开需"右键 → 打开"绕过 Gatekeeper;Windows 会有 SmartScreen 提示,选"仍要运行"。正式分发需购买 Apple Developer($99/年)和 Windows 代码签名证书后再配置签名。
 
 ## 路线图
 
