@@ -34,9 +34,8 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npx electron-builder ${{ matrix.args }} --publish never
-        env:
-          # 没有签名证书,禁用自动发现,打未签名包
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+        # 注意:不要设 CSC_IDENTITY_AUTO_DISCOVERY=false —— 它会让 identity: '-'
+        # 的 ad-hoc 签名也被跳过,导致下载安装的包被 Gatekeeper 死拦
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

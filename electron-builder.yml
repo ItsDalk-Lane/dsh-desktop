@@ -15,6 +15,12 @@ publish:
 # 全平台图标:mac 用 icns,win 用 ico,linux 用 icons/ 下的 png(按尺寸)
 mac:
   icon: build/icon.icns
+  # 无证书环境下强制完整 ad-hoc 签名:保证签名内部一致,
+  # 否则下载安装的包会被 Gatekeeper 以「环境完整性测试失败/负责人身份不一致」死拦
+  # (2026-08-23 用户从 GitHub Release 下载 0.1.2 实测踩坑)
+  identity: '-'
+  # ad-hoc 下关闭 hardened runtime:它只为正式公证服务,且 ad-hoc 组合会导致库校验启动失败
+  hardenedRuntime: false
   category: public.app-category.developer-tools
   target:
     # zip 供 electron-updater 增量更新用(latest-mac.yml 指向 zip)

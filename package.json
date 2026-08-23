@@ -1,6 +1,6 @@
 {
   "name": "dsh-desktop",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "DSH Desktop \u2014 a stable desktop house that hosts swappable DeepSeek Harness (dsh) engines",
   "main": "src/main/index.js",
   "private": true,
