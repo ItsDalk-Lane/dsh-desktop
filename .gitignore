@@ -43,4 +43,4 @@ worktrees/
 # dsh-desktop 遗留与产物
 .zcode/
 dist/
-release/
+/release/
