@@ -2,15 +2,19 @@ appId: com.dshdesktop.app
 productName: DSH Desktop
 directories:
   output: release
+  buildResources: build
 files:
   - src/**
   - dev-engines/**
   - package.json
+# 自动更新发布源(electron-updater 据此查找最新版本)
 publish:
   provider: github
   owner: ItsDalk-Lane
   repo: dsh-desktop
+# 全平台图标:mac 用 icns,win 用 ico,linux 用 icons/ 下的 png(按尺寸)
 mac:
+  icon: build/icon.icns
   category: public.app-category.developer-tools
   target:
     # zip 供 electron-updater 增量更新用(latest-mac.yml 指向 zip)
@@ -23,6 +27,8 @@ mac:
         - arm64
         - x64
 win:
+  icon: build/icon.ico
   target: nsis
-# 注意:房子本身除 electron-updater 外零原生依赖。
-# 真正的原生模块在"引擎包"里,由运行时下载到 userData —— 这是本架构的核心。
+linux:
+  icon: build/icons
+  target: AppImage
