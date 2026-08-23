@@ -98,7 +98,8 @@
           ]
         }
       ],
-      "identity": "-"
+      "identity": "-",
+      "artifactName": "DSH-Desktop-${version}-${arch}.${ext}"
     },
     "win": {
       "icon": "build/icon.ico",
