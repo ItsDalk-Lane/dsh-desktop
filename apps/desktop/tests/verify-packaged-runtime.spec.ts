@@ -5,12 +5,13 @@ import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 import { afterPack } from '../scripts/verify-packaged-runtime.ts'
 
-const UPDATE_URL = 'https://ml2022.oss-cn-hangzhou.aliyuncs.com/deepseek-harness-desktop/releases'
+const GITHUB_OWNER = 'ItsDalk-Lane'
+const GITHUB_REPO = 'dsh-desktop'
 
 function context(
   appOutDir: string,
   electronPlatformName = 'darwin',
-  publish: unknown = [{ provider: 'generic', url: UPDATE_URL, channel: 'rc' }],
+  publish: unknown = [{ provider: 'github', owner: GITHUB_OWNER, repo: GITHUB_REPO }],
 ) {
   return {
     appOutDir,
@@ -62,10 +63,10 @@ describe('packaged desktop runtime verification', () => {
         'app-update.yml',
       ), 'utf8'))
       expect(updateConfiguration).toEqual({
-        provider: 'generic',
-        url: UPDATE_URL,
+        provider: 'github',
+        owner: GITHUB_OWNER,
+        repo: GITHUB_REPO,
         updaterCacheDirName: 'deepseek-harness-updater',
-        channel: 'rc',
       })
     } finally {
       await rm(appOutDir, { recursive: true, force: true })
@@ -77,7 +78,7 @@ describe('packaged desktop runtime verification', () => {
     try {
       await writeRequiredMacRuntime(appOutDir)
       await expect(afterPack(context(appOutDir, 'darwin', null)))
-        .rejects.toThrow('packaged desktop requires one generic HTTPS update provider')
+        .rejects.toThrow('packaged desktop requires a GitHub or generic HTTPS update provider')
       await expect(afterPack(context(appOutDir, 'darwin', [{
         provider: 'generic',
         url: 'http://updates.example.test',
@@ -86,9 +87,17 @@ describe('packaged desktop runtime verification', () => {
         .rejects.toThrow('packaged desktop update provider must use HTTPS')
       await expect(afterPack(context(appOutDir, 'darwin', [{
         provider: 'generic',
-        url: UPDATE_URL,
+        url: 'https://updates.example.test',
       }])))
         .rejects.toThrow('packaged desktop requires an explicit update channel')
+      await expect(afterPack(context(appOutDir, 'darwin', [
+        { provider: 'github', owner: '  ', repo: GITHUB_REPO },
+      ])))
+        .rejects.toThrow('packaged desktop GitHub update provider requires owner and repo')
+      await expect(afterPack(context(appOutDir, 'darwin', [
+        { provider: 'github', owner: GITHUB_OWNER },
+      ])))
+        .rejects.toThrow('packaged desktop GitHub update provider requires owner and repo')
     } finally {
       await rm(appOutDir, { recursive: true, force: true })
     }

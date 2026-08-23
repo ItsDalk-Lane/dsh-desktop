@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,7 +44,6 @@ const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const repositoryRoot = resolve(desktopRoot, '../..')
 const workspaceConfiguration = readFileSync(resolve(repositoryRoot, 'pnpm-workspace.yaml'), 'utf8')
 const builderPatch = readFileSync(resolve(repositoryRoot, 'patches/app-builder-lib@26.15.3.patch'), 'utf8')
-const macReleaseScript = readFileSync(resolve(desktopRoot, 'scripts/release-mac.ts'), 'utf8')
 const windowsInstallerInclude = readFileSync(resolve(desktopRoot, 'build/installer.nsh'), 'utf8')
 const desktopPackage = JSON.parse(
   readFileSync(resolve(desktopRoot, 'package.json'), 'utf8'),
@@ -93,26 +92,21 @@ describe('desktop packaging configuration', () => {
     expect(builderPatch).toContain('"-k", keychainPassword, keychainFile')
   })
 
-  it('keeps the rounded RGBA icon byte-for-byte and shares it across macOS and Windows', () => {
-    const icon = readFileSync(resolve(desktopRoot, 'build/icon.png'))
-
-    expect(icon[25]).toBe(6)
-    expect(createHash('sha256').update(icon).digest('hex'))
-      .toBe('68616368acc6b96a14b8975ad6a1c5755187129e26b032e60c69252f8826c197')
-    expect(desktopPackage.build.mac.icon).toBe('build/icon.png')
-    expect(desktopPackage.build.win.icon).toBe('build/icon.png')
+  it('uses the DSH Desktop whale icons for macOS and Windows', () => {
+    expect(existsSync(resolve(desktopRoot, 'build/icon.icns'))).toBe(true)
+    expect(existsSync(resolve(desktopRoot, 'build/icon.ico'))).toBe(true)
+    expect(desktopPackage.build.mac.icon).toBe('build/icon.icns')
+    expect(desktopPackage.build.win.icon).toBe('build/icon.ico')
   })
 
   it('builds and stages the complete workspace before local packaging', () => {
-    expect(desktopPackage.scripts['build:applications'])
-      .toBe('pnpm --filter @fufan/dsh-plugin-llm-wiki run build:application')
+    expect(desktopPackage.scripts['build:applications']).toBeUndefined()
     for (const name of ['package', 'dist']) {
-      expect(desktopPackage.scripts[name]).toContain('pnpm run build:applications')
       expect(desktopPackage.scripts[name]).toContain('pnpm --workspace-root run build')
       expect(desktopPackage.scripts[name]).toContain('scripts/stage-runtime.ts')
     }
     expect(desktopPackage.scripts.package).toContain('electron-builder --dir')
-    expect(desktopPackage.scripts.package).not.toContain('release-preflight.ts')
+    expect(desktopPackage.scripts.dist).toContain('electron-builder --publish never')
   })
 
   it('routes desktop development through the fingerprinted launcher without weakening release builds', () => {
@@ -125,25 +119,25 @@ describe('desktop packaging configuration', () => {
       .toBe('pnpm --filter @deepseek-ai/dsh-desktop run dev:rebuild')
   })
 
-  it('makes the macOS DMG and ZIP update path signed, hardened, and notarized', () => {
-    const command = desktopPackage.scripts['dist:mac']
-
-    expect(command).toBe('node --import tsx scripts/release-mac.ts')
-    expect(macReleaseScript).toContain("'@fufan/dsh-plugin-llm-wiki', 'run', 'build:application'")
-    expect(macReleaseScript).toContain("'--mac', 'dmg', 'zip'")
-    expect(desktopPackage.build.mac.hardenedRuntime).toBe(true)
-    expect(desktopPackage.build.mac.notarize).toBe(true)
+  it('ships the macOS DMG and ZIP update path with full ad-hoc signing', () => {
+    expect(desktopPackage.scripts['dist:mac']).toBeUndefined()
+    expect(desktopPackage.build.mac.identity).toBe('-')
+    expect(desktopPackage.build.mac.hardenedRuntime).toBe(false)
+    expect(desktopPackage.build.mac.notarize).toBe(false)
+    expect(desktopPackage.build.mac.target).toEqual([
+      { target: 'dmg', arch: ['arm64', 'x64'] },
+      { target: 'zip', arch: ['arm64', 'x64'] },
+    ])
   })
 
   it('builds a per-user Windows x64 NSIS installer from a Windows-targeted runtime', () => {
-    expect(desktopPackage.scripts['dist:win']).toContain('pnpm run build:applications')
     expect(desktopPackage.scripts['dist:win']).toContain('DSH_DESKTOP_TARGET_PLATFORM=win32')
     expect(desktopPackage.scripts['dist:win']).toContain('DSH_DESKTOP_TARGET_ARCH=x64')
     expect(desktopPackage.scripts['dist:win']).toContain('scripts/release-win.ts')
     expect(builderPatch).toContain('ELECTRON_BUILDER_NSIS_TEMPLATE_DIR')
     expect(desktopPackage.build.win.target).toEqual(['nsis'])
     expect(desktopPackage.build.win.artifactName)
-      .toBe('DeepSeek-Harness-Desktop-Windows-x64-${version}-Setup.${ext}')
+      .toBe('DSH-Desktop-Windows-x64-${version}-Setup.${ext}')
     expect(desktopPackage.build.toolsets.nsis).toBe('1.2.1')
     expect(desktopPackage.build.nsis).toMatchObject({
       oneClick: false,
@@ -152,7 +146,7 @@ describe('desktop packaging configuration', () => {
       include: 'build/installer.nsh',
       createDesktopShortcut: 'always',
       createStartMenuShortcut: true,
-      shortcutName: 'DeepSeek Harness',
+      shortcutName: 'DSH Desktop',
     })
     expect(windowsInstallerInclude).toContain('--dsh-installer-quit')
     expect(windowsInstallerInclude).not.toContain('!macro customInit')
@@ -210,8 +204,6 @@ describe('desktop packaging configuration', () => {
   it('exposes generic, macOS, and Windows release commands at the repository root', () => {
     expect(rootPackage.scripts['dist:desktop'])
       .toBe('pnpm --filter @deepseek-ai/dsh-desktop run dist')
-    expect(rootPackage.scripts['dist:mac:desktop'])
-      .toBe('pnpm --filter @deepseek-ai/dsh-desktop run dist:mac')
     expect(rootPackage.scripts['dist:win:desktop'])
       .toBe('pnpm --filter @deepseek-ai/dsh-desktop run dist:win')
     expect(rootPackage.scripts['publish:desktop-update'])

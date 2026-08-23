@@ -34,6 +34,15 @@ interface GenericUpdateConfiguration {
   readonly channel: string
 }
 
+interface GitHubUpdateConfiguration {
+  readonly provider: 'github'
+  readonly owner: string
+  readonly repo: string
+  readonly updaterCacheDirName: string
+}
+
+type UpdateConfiguration = GenericUpdateConfiguration | GitHubUpdateConfiguration
+
 /**
  * Verify the Host files required before the application can start and write the
  * updater configuration for every target, including unpacked preview builds.
@@ -76,11 +85,25 @@ export async function afterPack(context: AfterPackContext): Promise<void> {
   )
 }
 
-function resolveUpdateConfiguration(context: AfterPackContext): GenericUpdateConfiguration {
+function resolveUpdateConfiguration(context: AfterPackContext): UpdateConfiguration {
   const configured: unknown = context.packager.config.publish
   const candidate = Array.isArray(configured) ? configured[0] : configured
+  if (isRecord(candidate) && candidate.provider === 'github') {
+    const owner = candidate.owner
+    const repo = candidate.repo
+    if (typeof owner !== 'string' || owner.trim() === ''
+      || typeof repo !== 'string' || repo.trim() === '') {
+      throw new Error('packaged desktop GitHub update provider requires owner and repo')
+    }
+    return {
+      provider: 'github',
+      owner,
+      repo,
+      updaterCacheDirName: context.packager.appInfo.updaterCacheDirName,
+    }
+  }
   if (!isRecord(candidate) || candidate.provider !== 'generic' || typeof candidate.url !== 'string') {
-    throw new Error('packaged desktop requires one generic HTTPS update provider')
+    throw new Error('packaged desktop requires a GitHub or generic HTTPS update provider')
   }
   let url: URL
   try {

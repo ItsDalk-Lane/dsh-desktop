@@ -150,7 +150,6 @@
     "dev:desktop:rebuild": "pnpm --filter @deepseek-ai/dsh-desktop run dev:rebuild",
     "package:desktop": "pnpm --filter @deepseek-ai/dsh-desktop run package",
     "dist:desktop": "pnpm --filter @deepseek-ai/dsh-desktop run dist",
-    "dist:mac:desktop": "pnpm --filter @deepseek-ai/dsh-desktop run dist:mac",
     "dist:win:desktop": "pnpm --filter @deepseek-ai/dsh-desktop run dist:win",
     "publish:desktop-update": "pnpm --filter @deepseek-ai/dsh-desktop run publish:update",
     "dev:desktop:web": "tsx scripts/dev-plugin-center.ts",
