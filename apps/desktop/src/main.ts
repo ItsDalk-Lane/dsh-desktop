@@ -71,6 +71,7 @@ import {
 import { createTrustedInstallRunner } from './plugin-center/trusted-install-executor.ts'
 import { createTrustedManagementRunner } from './plugin-center/trusted-management-executor.ts'
 import { desktopRendererUrl, PLUGIN_CENTER_PAGE_ID } from './renderer-navigation.ts'
+import { grantsDesktopPermission, originOfUrl } from './session-permissions.ts'
 import { DesktopUpdateController } from './update-controller.ts'
 import {
   createDesktopLifecycle,
@@ -314,8 +315,14 @@ function hasOrigin(raw: string, expected: string): boolean {
 /** Install navigation and permission policy before the first renderer loads. */
 function hardenSession(): void {
   const desktopSession = session.defaultSession
-  desktopSession.setPermissionCheckHandler(() => false)
-  desktopSession.setPermissionRequestHandler((_webContents, _permission, callback) => { callback(false) })
+  desktopSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin) =>
+    grantsDesktopPermission({ permission, requestingOrigin }, currentHostOrigin()))
+  desktopSession.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    callback(grantsDesktopPermission(
+      { permission, requestingOrigin: originOfUrl(details.requestingUrl) },
+      currentHostOrigin(),
+    ))
+  })
 }
 
 async function createMainWindow(): Promise<BrowserWindow> {
