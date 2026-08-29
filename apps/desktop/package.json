@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop",
   "description": "DSH Desktop — DeepSeek Harness 引擎桌面发行版(插件中心/插件发现/视觉增强)",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "main": "lib/main.js",
