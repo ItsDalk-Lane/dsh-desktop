@@ -53,6 +53,8 @@ async function defaultImage(): Promise<PreparedImage> {
 /** Props for the shared atomic enable dialog. */
 interface VisionEnhancementDialogProps {
   open: boolean
+  /** True while the capability is already enabled; copy becomes reconfigure wording. */
+  reconfigure?: boolean
   provider: VisionEnhancementState['provider']
   providers: VisionEnhancementState['providers']
   model: string
@@ -64,8 +66,8 @@ interface VisionEnhancementDialogProps {
 
 /** Verify a real image before enabling the shared visual capability. */
 export function VisionEnhancementDialog({
-  open, provider: activeProvider, providers, model: activeModel, baseUrl: activeBaseUrl,
-  failure: outerFailure, onClose, enable,
+  open, reconfigure = false, provider: activeProvider, providers, model: activeModel,
+  baseUrl: activeBaseUrl, failure: outerFailure, onClose, enable,
 }: VisionEnhancementDialogProps): ReactNode {
   const [apiKey, setApiKey] = useState('')
   const [provider, setProvider] = useState(activeProvider)
@@ -154,13 +156,20 @@ export function VisionEnhancementDialog({
   }
 
   return (
-    <Modal open={open} title="开启视觉能力增强" onClose={() => { if (!busy) onClose() }} className={css['modal'] as string}>
+    <Modal
+      open={open}
+      title={reconfigure ? '视觉能力增强设置' : '开启视觉能力增强'}
+      onClose={() => { if (!busy) onClose() }}
+      className={css['modal'] as string}
+    >
       <div className={css.modalBody}>
         <div className={css.hero}>
           <div className={css.heroIcon}>{({
             bailian: 'Q', openrouter: 'O', ollama: 'O', vllm: 'V', sglang: 'S', custom: 'C',
           } as const)[provider]}</div>
-          <div><strong>{selectedProvider?.name ?? '视觉提供方'} · {model}</strong><span>验证通过后，能力会自动挂载到四个内置 Agent，以及未来新增的 Agent Preset。</span></div>
+          <div><strong>{selectedProvider?.name ?? '视觉提供方'} · {model}</strong><span>{reconfigure
+            ? '验证通过后，新模型立即生效并自动挂载到所有内置 Agent，以及未来新增的 Agent Preset。'
+            : '验证通过后，能力会自动挂载到四个内置 Agent，以及未来新增的 Agent Preset。'}</span></div>
         </div>
         <div className={css.fieldGrid}>
           <label className={css.field}>
@@ -210,12 +219,12 @@ export function VisionEnhancementDialog({
             <label className={css.upload}>更换验证图片<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={pickImage} disabled={busy} /></label>
           </div>
         </div>
-        {result !== undefined && <div className={css.success}><strong>识别成功，视觉能力已开启</strong><p>{result}</p></div>}
+        {result !== undefined && <div className={css.success}><strong>{reconfigure ? '识别成功，视觉模型已更新' : '识别成功，视觉能力已开启'}</strong><p>{result}</p></div>}
         {(failure ?? outerFailure) !== undefined && <div className={css.error} role="alert">{failure ?? outerFailure}</div>}
         <p className={css.privacy}>验证图片只会发送至 {selectedProvider?.baseUrlEditable === true ? baseUrl || '你填写的服务地址' : selectedProvider?.name ?? '所选视觉提供方'}；API Key 仅保存在本机受保护的凭证文件中，不会写入对话或项目代码。</p>
         <div className={css.actions}>
           <button type="button" className={css.secondary} disabled={busy} onClick={onClose}>{result === undefined ? '取消' : '完成'}</button>
-          {result === undefined && <button type="button" className={css.primary} disabled={busy || image === undefined || selectedProvider === undefined} onClick={() => { void verify() }}>{busy ? `正在调用 ${selectedProvider?.name ?? '视觉服务'} 验证…` : '验证并开启'}</button>}
+          {result === undefined && <button type="button" className={css.primary} disabled={busy || image === undefined || selectedProvider === undefined} onClick={() => { void verify() }}>{busy ? `正在调用 ${selectedProvider?.name ?? '视觉服务'} 验证…` : reconfigure ? '验证并应用' : '验证并开启'}</button>}
         </div>
       </div>
     </Modal>

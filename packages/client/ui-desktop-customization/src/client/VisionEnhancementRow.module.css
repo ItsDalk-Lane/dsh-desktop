@@ -13,6 +13,10 @@
 .toggle span,.toggleOn span { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.22); transition:transform .18s ease; }
 .toggleOn span { transform:translateX(18px); }
 .toggle:disabled,.toggleOn:disabled { cursor:default; opacity:.55; }
+.config { height:26px; padding:0 11px; border:1px solid var(--dsw-alias-border-l2); border-radius:13px; color:var(--dsw-alias-label-primary); background:var(--dsw-alias-bg-layer-1); font:inherit; font-size:12px; line-height:18px; cursor:pointer; transition:background-color 100ms ease,border-color 100ms ease; }
+.config:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
+.config:focus-visible { outline:2px solid var(--dsw-alias-state-business-primary); outline-offset:2px; }
+.config:disabled { cursor:default; opacity:.55; }
 .shortcut,.shortcutOn { display:inline-flex; height:28px; align-items:center; gap:5px; padding:0 8px; border:0; border-radius:999px; color:var(--dsw-alias-label-secondary); background:transparent; font:inherit; font-size:13px; font-weight:500; line-height:20px; white-space:nowrap; cursor:pointer; transition:color 100ms ease,background-color 100ms ease; }
 .shortcut:hover:not(:disabled) { background:var(--dsw-alias-interactive-bg-hover); }
 .shortcutOn { color:var(--dsw-alias-state-business-primary); background:var(--dsw-alias-state-business-tertiary); }
@@ -26,6 +30,10 @@
 .shortcutHoverOn { color:var(--dsw-static-deepseek-300); background:color-mix(in srgb,var(--dsw-static-deepseek-400) 18%,transparent); }
 .shortcutHover p { margin:0; color:var(--dsw-static-neutral-bluish-300); font-size:12px; line-height:18px; }
 .shortcutHoverHint { padding-top:7px; border-top:1px solid color-mix(in srgb,var(--dsw-static-neutral-bluish-00) 12%,transparent); color:var(--dsw-static-neutral-bluish-400); font-size:11px; line-height:16px; }
+.shortcutHoverAction { align-self:flex-start; height:26px; padding:0 11px; border:1px solid color-mix(in srgb,var(--dsw-static-neutral-bluish-00) 22%,transparent); border-radius:13px; color:var(--dsw-static-neutral-bluish-00); background:transparent; font:inherit; font-size:11px; line-height:16px; cursor:pointer; transition:background-color 100ms ease; }
+.shortcutHoverAction:hover:not(:disabled) { background:color-mix(in srgb,var(--dsw-static-neutral-bluish-00) 12%,transparent); }
+.shortcutHoverAction:focus-visible { outline:2px solid var(--dsw-static-neutral-bluish-300); outline-offset:2px; }
+.shortcutHoverAction:disabled { cursor:default; opacity:.55; }
 .modal { width:min(680px,calc(100vw - 32px)); }
 .modalBody { display:flex; flex-direction:column; gap:16px; color:var(--dsw-alias-label-primary); }
 .hero { display:flex; align-items:center; gap:13px; padding:14px; border:1px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 24%,var(--dsw-alias-border-l1)); border-radius:14px; background:linear-gradient(135deg,color-mix(in srgb,var(--dsw-alias-brand-primary) 9%,var(--dsw-alias-bg-layer-1)),var(--dsw-alias-bg-layer-1)); }

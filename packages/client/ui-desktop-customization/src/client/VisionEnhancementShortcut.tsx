@@ -63,7 +63,7 @@ function routeText(route: VisionRouteView | undefined): string | undefined {
 
 function statusText(state: VisionEnhancementState, route?: VisionRouteView, modelReady = true): string {
   if (state.status === 'loading' || state.status === 'idle') return '正在读取状态'
-  if (state.status === 'saving') return state.enabled ? '正在关闭' : '正在开启'
+  if (state.status === 'saving') return '正在处理'
   if (state.status === 'error') return '状态异常，点击重新配置'
   if (!modelReady) return '正在读取当前模型'
   if (state.enabled) return routeText(route) === undefined ? '已开启，正在匹配路径' : `已开启 · ${routeText(route)}`
@@ -75,6 +75,8 @@ function hoverContent(
   route: VisionRouteView | undefined,
   routeError: string | undefined,
   modelReady: boolean,
+  busy: boolean,
+  onConfigure: () => void,
 ): ReactNode {
   const providerName = state.providers.find(provider => provider.id === state.provider)?.name ?? state.provider
   const routeDescription = !state.enabled
@@ -96,6 +98,12 @@ function hoverContent(
       </div>
       <p>{routeDescription}</p>
       <div className={css.shortcutHoverHint}>{routeError ?? state.error ?? statusText(state, route, modelReady)}</div>
+      <button
+        type="button"
+        className={css.shortcutHoverAction}
+        disabled={busy}
+        onClick={onConfigure}
+      >{state.enabled ? '更换视觉模型' : '设置视觉模型'}</button>
     </div>
   )
 }
@@ -138,6 +146,10 @@ export function VisionEnhancementShortcut({
   }, [currentModel?.model, currentModel?.provider, resolveRoute, state.enabled])
 
   const busy = state.status === 'idle' || state.status === 'loading' || state.status === 'saving' || activating
+  const openConfigure = (): void => {
+    setFailure(undefined)
+    setDialogOpen(true)
+  }
   const activate = (): void => {
     setFailure(undefined)
     if (!state.enabled) {
@@ -184,10 +196,11 @@ export function VisionEnhancementShortcut({
             <span className={css.shortcutLabel}>视觉增强</span>
           </button>
         )}
-        content={hoverContent(state, route, routeError, currentModel !== null)}
+        content={hoverContent(state, route, routeError, currentModel !== null, busy, openConfigure)}
       />
       <VisionEnhancementDialog
         open={dialogOpen}
+        reconfigure={state.enabled}
         provider={state.provider}
         providers={state.providers}
         model={state.model}

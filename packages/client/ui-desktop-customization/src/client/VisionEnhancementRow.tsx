@@ -30,6 +30,10 @@ export function VisionEnhancementRow({
 
   const busy = state.status === 'idle' || state.status === 'loading' || state.status === 'saving'
   const providerName = state.providers.find(provider => provider.id === state.provider)?.name ?? state.provider
+  const openConfigure = (): void => {
+    setFailure(undefined)
+    setOpen(true)
+  }
   const activate = (): void => {
     setFailure(undefined)
     if (!state.enabled) {
@@ -59,6 +63,13 @@ export function VisionEnhancementRow({
           <span className={state.enabled ? css.statusOn : css.status}>{status}</span>
           <button
             type="button"
+            className={css.config}
+            aria-label="视觉能力增强设置"
+            disabled={busy}
+            onClick={openConfigure}
+          >设置</button>
+          <button
+            type="button"
             className={state.enabled ? css.toggleOn : css.toggle}
             role="switch"
             aria-checked={state.enabled}
@@ -70,6 +81,7 @@ export function VisionEnhancementRow({
       </div>
       <VisionEnhancementDialog
         open={open}
+        reconfigure={state.enabled}
         provider={state.provider}
         providers={state.providers}
         model={state.model}

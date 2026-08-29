@@ -143,11 +143,29 @@ describe('Vision enhancement composer shortcut', () => {
     fireEvent.pointerEnter(control)
     await act(async () => { vi.advanceTimersByTime(350) })
     expect(screen.getByText(/deepseek-v4-flash-vision-exp/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: '设置视觉模型' })).toBeTruthy()
     expect(control.textContent).toBe('视觉增强')
 
     vi.useRealTimers()
     fireEvent.click(control)
     expect(await screen.findByText('阿里云百炼 · qwen3.8-max')).toBeTruthy()
+  })
+
+  it('opens the compatible-vision setup dialog from the hover card while the capability is on', async () => {
+    vi.useFakeTimers()
+    render(<VisionEnhancementShortcut {...shortcutProps(ready(true, true), {
+      resolveRoute: (modelProvider: string, model: string) => Promise.resolve({ mode: 'native' as const, modelProvider, model }),
+    })} />)
+    fireEvent.pointerEnter(screen.getByRole('switch', { name: /已开启/ }))
+    await act(async () => { vi.advanceTimersByTime(350) })
+
+    fireEvent.click(screen.getByRole('button', { name: '更换视觉模型' }))
+    expect(screen.getByRole('dialog', { name: '视觉能力增强设置' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '验证并应用' })).toBeTruthy()
+
+    vi.useRealTimers()
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByRole('dialog', { name: '视觉能力增强设置' })).toBeNull()
   })
 
   it('enables a native visual route directly without opening credential setup', async () => {
@@ -270,5 +288,36 @@ describe('Vision enhancement settings', () => {
       apiKey: 'openrouter-test-key', provider: 'openrouter', model: 'openai/gpt-4.1-mini',
       mediaType: 'image/webp',
     }), expect.any(AbortSignal))
+  })
+
+  it('offers the standing settings entry while enabled and re-applies a new model through verification', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['image'], { type: 'image/webp' })),
+    })))
+    const enable = vi.fn(() => Promise.resolve('换了模型后的小猫描述。'))
+    const disable = vi.fn(() => Promise.resolve())
+    const props = {
+      useVisionEnhancement: (select: (value: ReturnType<typeof ready>) => unknown) => select(ready(true, true)),
+      load: () => Promise.resolve(),
+      disable,
+      enable,
+    } as unknown as VisionEnhancementRowProps
+
+    render(<VisionEnhancementRow {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: '视觉能力增强设置' }))
+    expect(screen.getByRole('dialog', { name: '视觉能力增强设置' })).toBeTruthy()
+    expect(screen.getByText('验证通过后，新模型立即生效并自动挂载到所有内置 Agent，以及未来新增的 Agent Preset。')).toBeTruthy()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '验证并应用' }).hasAttribute('disabled')).toBe(false)
+    })
+    fireEvent.click(screen.getByRole('button', { name: '验证并应用' }))
+
+    expect(await screen.findByText('识别成功，视觉模型已更新')).toBeTruthy()
+    expect(enable).toHaveBeenCalledWith(expect.objectContaining({
+      provider: 'bailian', model: 'qwen3.8-max', mediaType: 'image/webp',
+    }), expect.any(AbortSignal))
+    expect(disable).not.toHaveBeenCalled()
   })
 })
